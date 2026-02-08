@@ -3,6 +3,9 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { supabase } from './lib/supabase.js'
 
+import friendRequestsRouter from './routes/friendRequests.js'
+import usersRouter from './routes/users.js'
+
 dotenv.config()
 
 const app = express()
@@ -10,6 +13,10 @@ const PORT = process.env.PORT || 3001
 
 app.use(cors())
 app.use(express.json())
+
+// Define all routes in the routes subfolder here
+app.use('/api/friend-requests', friendRequestsRouter)
+app.use('/api/users', usersRouter)
 
 // Test the supabase connection with this endpoint
 app.get('/api/test-db', async (req, res) => {

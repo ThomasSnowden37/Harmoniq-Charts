@@ -8,18 +8,21 @@ export interface Database {
           id: string
           username: string
           email: string
+          privacy: 'public' | 'private'
           created_at: string
         }
         Insert: {
           id: string
           username: string
           email: string
+          privacy?: 'public' | 'private'
           created_at?: string
         }
         Update: {
           id?: string
           username?: string
           email?: string
+          privacy?: 'public' | 'private'
           created_at?: string
         }
       }
@@ -272,6 +275,29 @@ export interface Database {
           created_at?: string
         }
       }
+      friend_requests: {
+        Row: {
+          id: string
+          requester_id: string
+          addressee_id: string
+          status: 'pending' | 'accepted' | 'rejected'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          requester_id: string
+          addressee_id: string
+          status?: 'pending' | 'accepted' | 'rejected'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          requester_id?: string
+          addressee_id?: string
+          status?: 'pending' | 'accepted' | 'rejected'
+          created_at?: string
+        }
+      }
     }
   }
 }
@@ -289,3 +315,4 @@ export type Listened = Tables['listened']['Row']
 export type Playlist = Tables['playlists']['Row']
 export type PlaylistSong = Tables['playlist_songs']['Row']
 export type Recommendation = Tables['recommendations']['Row']
+export type FriendRequest = Tables['friend_requests']['Row']

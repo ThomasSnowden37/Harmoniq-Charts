@@ -3,7 +3,8 @@ CREATE TABLE users (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    privacy VARCHAR(10) NOT NULL DEFAULT 'public' CHECK (privacy IN ('public', 'private'))
 );
 
 -- Artists table
@@ -98,6 +99,17 @@ CREATE TABLE playlist_songs (
     UNIQUE(playlist_id, song_id) -- No duplicate songs in a playlist
 );
 
+-- FRIEND REQUESTS
+CREATE TABLE friend_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    requester_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    addressee_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(requester_id, addressee_id), -- One request per direction
+    CHECK (requester_id != addressee_id) -- Prevent self-follow
+);
+
 -- RECOMMENDATIONS
 CREATE TABLE recommendations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -121,6 +133,8 @@ CREATE INDEX idx_playlists_user_id ON playlists(user_id);
 CREATE INDEX idx_playlist_songs_playlist_id ON playlist_songs(playlist_id);
 CREATE INDEX idx_songs_album_id ON songs(album_id);
 CREATE INDEX idx_recommendations_source ON recommendations(source_song_id);
+CREATE INDEX idx_friend_requests_requester ON friend_requests(requester_id);
+CREATE INDEX idx_friend_requests_addressee ON friend_requests(addressee_id);
 
 -- Enable RLS on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -138,6 +152,7 @@ ALTER TABLE albums ENABLE ROW LEVEL SECURITY;
 ALTER TABLE song_artists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE album_artists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recommendations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE friend_requests ENABLE ROW LEVEL SECURITY;
 
 -- Policies for public content (songs, artists, albums)
 CREATE POLICY "Public read access" ON songs FOR SELECT USING (true);
@@ -189,3 +204,13 @@ CREATE POLICY "Users can delete own playlist songs" ON playlist_songs FOR DELETE
 CREATE POLICY "Anyone can read recommendations" ON recommendations FOR SELECT USING (true);
 CREATE POLICY "Users can rate recommendations" ON recommendations FOR UPDATE
     USING (auth.uid() = user_id OR user_id IS NULL);
+
+-- Friend requests
+CREATE POLICY "Users can view own friend requests" ON friend_requests FOR SELECT
+    USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
+CREATE POLICY "Users can send friend requests" ON friend_requests FOR INSERT
+    WITH CHECK (auth.uid() = requester_id);
+CREATE POLICY "Users can update received requests" ON friend_requests FOR UPDATE
+    USING (auth.uid() = addressee_id);
+CREATE POLICY "Users can cancel sent requests" ON friend_requests FOR DELETE
+    USING (auth.uid() = requester_id);

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import UserProfile from './pages/UserProfile'
 
 function Home() {
   return (
@@ -10,11 +11,13 @@ function Home() {
   )
 }
 
+// Define routes to various pages here
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/user/:userId" element={<UserProfile />} />
       </Routes>
     </BrowserRouter>
   )
