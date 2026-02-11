@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-
-
-// TODO: Replace with real auth context
-const MOCK_CURRENT_USER_ID = 'mock-user-1'
+import { MOCK_CURRENT_USER_ID } from '../lib/auth'
+import FriendsModal from '../features/friends/components/FriendsModal'
+import SettingsModal from '../features/settings/components/SettingsModal'
+import type { PrivacySetting } from '../features/settings/types'
 
 type RelationshipStatus = 'none' | 'friends' | 'outgoing_pending' | 'incoming_pending'
 
 interface ProfileUser {
   id: string
   username: string
-  privacy: 'public' | 'private'
+  privacy: PrivacySetting
+  restricted?: boolean
 }
 
 interface RelationshipData {
@@ -24,9 +25,9 @@ interface RelationshipData {
  * Description:
  * This defines the UI for user's profile. Manages being able to see another user's profile page
  * See the comments on the functions for more implementation details.
- *  
+ *
  * Author: Tristan Sze
- * 
+ *
  */
 
 // TODO: I need to replace all the mock info with the user tables info
@@ -38,6 +39,8 @@ export default function UserProfile() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showFriendsModal, setShowFriendsModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   const isOwnProfile = userId === MOCK_CURRENT_USER_ID
 
@@ -49,11 +52,13 @@ export default function UserProfile() {
     }
   }, [userId])
 
-  // Hits the get endpoint for the profiles information 
+  // Hits the get endpoint for the profiles information
   async function fetchProfile() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/users/${userId}`)
+      const res = await fetch(`/api/users/${userId}`, {
+        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+      })
       if (!res.ok) throw new Error('User not found')
       const data = await res.json()
       setProfileUser(data)
@@ -120,7 +125,7 @@ export default function UserProfile() {
     }
   }
 
-  // Ability to accept the friend requests 
+  // Ability to accept the friend requests
   async function acceptRequest() {
     if (!relationship.request) return
     setActionLoading(true)
@@ -155,9 +160,29 @@ export default function UserProfile() {
     }
   }
 
+  // Render the buttons for own profile (Manage Friends + Settings)
+  function renderOwnProfileButtons() {
+    return (
+      <div className="flex gap-2">
+        <button
+          onClick={() => setShowFriendsModal(true)}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+        >
+          Manage Friends
+        </button>
+        <button
+          onClick={() => setShowSettingsModal(true)}
+          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+        >
+          Settings
+        </button>
+      </div>
+    )
+  }
+
   // Render the button based on the status of friendship
   function renderFriendButton() {
-    if (isOwnProfile) return null
+    if (isOwnProfile) return renderOwnProfileButtons()
 
     switch (relationship.status) {
       case 'none':
@@ -191,6 +216,12 @@ export default function UserProfile() {
     }
   }
 
+  function handlePrivacyChange(privacy: PrivacySetting) {
+    if (profileUser) {
+      setProfileUser({ ...profileUser, privacy })
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
@@ -206,6 +237,8 @@ export default function UserProfile() {
       </div>
     )
   }
+
+  const isRestricted = !isOwnProfile && profileUser?.restricted
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -226,12 +259,35 @@ export default function UserProfile() {
           </div>
         )}
 
-        {relationship.status === 'friends' && (
-          <div className="bg-green-900/30 border border-green-700 rounded-lg p-3 mb-4">
-            <p className="text-green-300 text-sm">You are friends with this user</p>
+        {isRestricted ? (
+          <div className="bg-gray-800 rounded-lg p-8 text-center">
+            <p className="text-gray-400 text-lg mb-2">This account is private</p>
+            <p className="text-gray-500 text-sm">Send a friend request to see their content.</p>
           </div>
+        ) : (
+          <>
+            {relationship.status === 'friends' && (
+              <div className="bg-green-900/30 border border-green-700 rounded-lg p-3 mb-4">
+                <p className="text-green-300 text-sm">You are friends with this user</p>
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      <FriendsModal
+        isOpen={showFriendsModal}
+        onClose={() => setShowFriendsModal(false)}
+      />
+
+      {profileUser && (
+        <SettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
+          currentPrivacy={profileUser.privacy}
+          onPrivacyChange={handlePrivacyChange}
+        />
+      )}
     </div>
   )
 }

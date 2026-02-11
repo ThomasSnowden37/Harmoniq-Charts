@@ -58,7 +58,7 @@ router.get('/incoming', async (req, res) => {
     .select('*, requester:users!requester_id(id, username)')
     .eq('addressee_id', userId)
     .eq('status', 'pending')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }) // I guess if these queries become too big we could use an ORM like prisma
 
   if (error) return res.status(500).json({ error: error.message })
   res.json(data)

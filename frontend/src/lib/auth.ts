@@ -1,0 +1,2 @@
+// TODO: Replace with real auth
+export const MOCK_CURRENT_USER_ID = '11111111-1111-1111-1111-111111111111'
