@@ -4,6 +4,18 @@ import { MOCK_CURRENT_USER_ID } from '../lib/auth'
 import FriendsModal from '../features/friends/components/FriendsModal'
 import SettingsModal from '../features/settings/components/SettingsModal'
 import type { PrivacySetting } from '../features/settings/types'
+import {
+  Avatar,
+  Badge,
+  Box,
+  Button,
+  Card,
+  Flex,
+  Heading,
+  Separator,
+  Tabs,
+  Text,
+} from '@radix-ui/themes'
 
 type RelationshipStatus = 'none' | 'friends' | 'outgoing_pending' | 'incoming_pending'
 
@@ -43,6 +55,13 @@ export default function UserProfile() {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   const isOwnProfile = userId === MOCK_CURRENT_USER_ID
+
+  // TODO: Replace with real data from API
+  const stats = {
+    reviews: 0,
+    friends: 0,
+    playlists: 0,
+  }
 
   useEffect(() => {
     if (!userId) return
@@ -117,7 +136,7 @@ export default function UserProfile() {
         headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
       })
       if (!res.ok) throw new Error('Failed to cancel request')
-      setRelationship({ status: 'none' }) // Clear the relation between the users
+      setRelationship({ status: 'none' })
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -160,58 +179,44 @@ export default function UserProfile() {
     }
   }
 
-  // Render the buttons for own profile (Manage Friends + Settings)
-  function renderOwnProfileButtons() {
-    return (
-      <div className="flex gap-2">
-        <button
-          onClick={() => setShowFriendsModal(true)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-        >
-          Manage Friends
-        </button>
-        <button
-          onClick={() => setShowSettingsModal(true)}
-          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
-        >
-          Settings
-        </button>
-      </div>
-    )
-  }
-
-  // Render the button based on the status of friendship
-  function renderFriendButton() {
-    if (isOwnProfile) return renderOwnProfileButtons()
+  function renderActionButtons() {
+    if (isOwnProfile) {
+      return (
+        <Flex gap="2">
+          <Button onClick={() => setShowFriendsModal(true)}>
+            Manage Friends
+          </Button>
+          <Button variant="outline" onClick={() => setShowSettingsModal(true)}>
+            Settings
+          </Button>
+        </Flex>
+      )
+    }
 
     switch (relationship.status) {
       case 'none':
         return (
-          <button onClick={sendFriendRequest} disabled={actionLoading}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50">
+          <Button onClick={sendFriendRequest} disabled={actionLoading}>
             {actionLoading ? 'Sending...' : 'Add Friend'}
-          </button>
+          </Button>
         )
       case 'outgoing_pending':
         return (
-          <button onClick={cancelRequest} disabled={actionLoading}
-            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg disabled:opacity-50">
+          <Button variant="soft" color="orange" onClick={cancelRequest} disabled={actionLoading}>
             {actionLoading ? 'Cancelling...' : 'Pending - Cancel Request'}
-          </button>
+          </Button>
         )
       case 'incoming_pending':
         return (
-          <button onClick={acceptRequest} disabled={actionLoading}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50">
+          <Button color="green" onClick={acceptRequest} disabled={actionLoading}>
             {actionLoading ? 'Accepting...' : 'Accept Friend Request'}
-          </button>
+          </Button>
         )
       case 'friends':
         return (
-          <button onClick={unfriend} disabled={actionLoading}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50">
+          <Button color="red" variant="soft" onClick={unfriend} disabled={actionLoading}>
             {actionLoading ? 'Unfollowing...' : 'Unfollow'}
-          </button>
+          </Button>
         )
     }
   }
@@ -224,56 +229,137 @@ export default function UserProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <p>Loading profile...</p>
-      </div>
+      <Flex align="center" justify="center" className="min-h-screen">
+        <Text color="gray">Loading profile...</Text>
+      </Flex>
     )
   }
 
   if (error && !profileUser) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <p className="text-red-400">{error}</p>
-      </div>
+      <Flex align="center" justify="center" className="min-h-screen">
+        <Text color="red">{error}</Text>
+      </Flex>
     )
   }
 
   const isRestricted = !isOwnProfile && profileUser?.restricted
+  const initials = profileUser?.username?.slice(0, 2).toUpperCase() ?? '??'
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <div className="max-w-2xl mx-auto p-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">{profileUser?.username}</h1>
-            <p className="text-gray-400 mt-1">
-              {profileUser?.privacy === 'private' ? 'Private Account' : 'Public Account'}
-            </p>
-          </div>
-          {renderFriendButton()}
-        </div>
+    <Box className="min-h-screen" p="4">
+      <Box className="max-w-3xl mx-auto" pt="6">
+        {/* Profile Header */}
+        <Card size="3">
+          <Flex align="center" gap="5">
+            <Avatar
+              size="7"
+              fallback={initials}
+              color="indigo"
+              variant="solid"
+            />
+            <Box className="flex-1 min-w-0">
+              <Flex align="center" gap="3" wrap="wrap">
+                <Heading size="6">{profileUser?.username}</Heading>
+                <Badge
+                  variant="soft"
+                  color={profileUser?.privacy === 'private' ? 'gray' : 'blue'}
+                >
+                  {profileUser?.privacy === 'private' ? 'Private' : 'Public'}
+                </Badge>
+                {relationship.status === 'friends' && (
+                  <Badge variant="soft" color="green">Friends</Badge>
+                )}
+              </Flex>
+              <Box mt="3">
+                {renderActionButtons()}
+              </Box>
+            </Box>
+          </Flex>
 
-        {error && (
-          <div className="bg-red-900/50 border border-red-700 rounded-lg p-3 mb-4">
-            <p className="text-red-300 text-sm">{error}</p>
-          </div>
-        )}
+          {error && (
+            <Box mt="4" p="3" className="rounded-lg border border-red-200 bg-red-50">
+              <Text color="red" size="2">{error}</Text>
+            </Box>
+          )}
 
+          <Separator size="4" my="5" />
+
+          {/* Stats Row */}
+          <Flex justify="center" gap="8">
+            <Box className="text-center">
+              <Text size="7" weight="bold" as="p">{stats.reviews}</Text>
+              <Text size="2" color="gray">Reviews</Text>
+            </Box>
+            <Box className="text-center">
+              <Text size="7" weight="bold" as="p">{stats.friends}</Text>
+              <Text size="2" color="gray">Friends</Text>
+            </Box>
+            <Box className="text-center">
+              <Text size="7" weight="bold" as="p">{stats.playlists}</Text>
+              <Text size="2" color="gray">Playlists</Text>
+            </Box>
+          </Flex>
+        </Card>
+
+        {/* Restricted message */}
         {isRestricted ? (
-          <div className="bg-gray-800 rounded-lg p-8 text-center">
-            <p className="text-gray-400 text-lg mb-2">This account is private</p>
-            <p className="text-gray-500 text-sm">Send a friend request to see their content.</p>
-          </div>
+          <Card size="3" mt="5">
+            <Flex direction="column" align="center" py="8">
+              <Text size="4" weight="medium" color="gray">This account is private</Text>
+              <Text size="2" color="gray" mt="1">Send a friend request to see their content.</Text>
+            </Flex>
+          </Card>
         ) : (
-          <>
-            {relationship.status === 'friends' && (
-              <div className="bg-green-900/30 border border-green-700 rounded-lg p-3 mb-4">
-                <p className="text-green-300 text-sm">You are friends with this user</p>
-              </div>
-            )}
-          </>
+          /* Reviews & Playlists Tabs */
+          <Tabs.Root defaultValue="reviews" className="mt-5">
+            <Tabs.List>
+              <Tabs.Trigger value="reviews">Reviews</Tabs.Trigger>
+              <Tabs.Trigger value="playlists">Playlists</Tabs.Trigger>
+            </Tabs.List>
+
+            <Tabs.Content value="reviews">
+              <Card size="3" mt="3">
+                <Heading size="4" mb="4">Reviews</Heading>
+                {stats.reviews === 0 ? (
+                  <Flex direction="column" align="center" py="6">
+                    <Text color="gray">No reviews yet.</Text>
+                    {isOwnProfile && (
+                      <Text size="2" color="gray" mt="1">
+                        Share your thoughts on your favorite music!
+                      </Text>
+                    )}
+                  </Flex>
+                ) : (
+                  <Flex direction="column" gap="4">
+                    {/* TODO: Map over real reviews here */}
+                  </Flex>
+                )}
+              </Card>
+            </Tabs.Content>
+
+            <Tabs.Content value="playlists">
+              <Card size="3" mt="3">
+                <Heading size="4" mb="4">Playlists</Heading>
+                {stats.playlists === 0 ? (
+                  <Flex direction="column" align="center" py="6">
+                    <Text color="gray">No playlists yet.</Text>
+                    {isOwnProfile && (
+                      <Text size="2" color="gray" mt="1">
+                        Create a playlist to share your favorite tracks!
+                      </Text>
+                    )}
+                  </Flex>
+                ) : (
+                  <Flex direction="column" gap="4">
+                    {/* TODO: Map over real playlists here */}
+                  </Flex>
+                )}
+              </Card>
+            </Tabs.Content>
+          </Tabs.Root>
         )}
-      </div>
+      </Box>
 
       <FriendsModal
         isOpen={showFriendsModal}
@@ -288,6 +374,6 @@ export default function UserProfile() {
           onPrivacyChange={handlePrivacyChange}
         />
       )}
-    </div>
+    </Box>
   )
 }
