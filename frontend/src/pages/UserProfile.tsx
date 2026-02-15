@@ -16,6 +16,8 @@ import {
   Tabs,
   Text,
 } from '@radix-ui/themes'
+import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
 type RelationshipStatus = 'none' | 'friends' | 'outgoing_pending' | 'incoming_pending'
 
@@ -247,8 +249,9 @@ export default function UserProfile() {
   const initials = profileUser?.username?.slice(0, 2).toUpperCase() ?? '??'
 
   return (
-    <Box className="min-h-screen" p="4">
-      <Box className="max-w-3xl mx-auto" pt="6">
+    <Box className="min-h-screen">
+      <Navbar />
+      <Box className="max-w-3xl mx-auto" p="4" pt="6">
         {/* Profile Header */}
         <Card size="3">
           <Flex align="center" gap="5">
@@ -374,6 +377,9 @@ export default function UserProfile() {
           onPrivacyChange={handlePrivacyChange}
         />
       )}
+      <Box mt="8">
+        <Footer />
+      </Box>
     </Box>
   )
 }
