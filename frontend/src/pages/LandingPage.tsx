@@ -211,23 +211,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24 bg-gradient-to-br from-indigo-50 to-purple-50">
-        <div className="max-w-2xl mx-auto px-6 text-center">
-          <Heading size="8" weight="bold" className="text-gray-900 mb-4">
-            Join Harmoniq Today
-          </Heading>
-          <Text size="3" className="text-gray-600 block mb-8">
-            It's free to get started on Harmoniq. Find your next song with a couple of clicks. 
-          </Text>
-          <Link to={`/user/${MOCK_CURRENT_USER_ID}`}>
-            <Button size="4" className="cursor-pointer">
-              Sign up
-            </Button>
-          </Link>
-        </div>
-      </section>
-
       <Footer />
     </div>
   )
