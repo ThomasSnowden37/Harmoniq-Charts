@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import UserProfile from './pages/UserProfile'
+import LandingPage from './pages/LandingPage'
 import CreateSong from './pages/CreateSong'
 import { MOCK_CURRENT_USER_ID } from './lib/auth'
 
@@ -26,7 +27,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/user/:userId" element={<UserProfile />} />
         <Route path="/songs/add" element={<CreateSong  />} />
       </Routes>
