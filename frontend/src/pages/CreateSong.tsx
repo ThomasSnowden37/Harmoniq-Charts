@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MOCK_CURRENT_USER_ID } from '../lib/auth'
+import { MOCK_CURRENT_USER_ID } from '../lib/auth' //need to get acutal auths
 import {
   Avatar,
   Badge,
@@ -37,7 +37,8 @@ export default function CreateSong() {
   const [bpm, setBpm] = useState('')
   const [genre, setGenre] = useState('')
   const [yearreleased, setYearReleased] = useState('')
-  const [albumID, setAlbumID] = useState('')
+  const [album, setAlbum] = useState('')
+  const [artist, setArtist] = useState('')
   const [error, setError] = useState('')
 
 
@@ -53,7 +54,8 @@ export default function CreateSong() {
           bpm: Number(bpm),
           genre,
           year_released: Number(yearreleased),
-          album_id: albumID,
+          album_name: album,
+          artist_name: artist
         }),
       })
       const data = await res.json()
@@ -65,7 +67,8 @@ export default function CreateSong() {
         setBpm('')
         setGenre('')
         setYearReleased('')
-        setAlbumID('')
+        setAlbum('')
+        setArtist('')
       }
 
     } catch (err: any) {
@@ -107,9 +110,15 @@ return (
         className="p-2 rounded bg-gray-700 text-white"
         required/>
       <input
-        value = {albumID}
-        onChange={(e) => setAlbumID(e.target.value)}
-        placeholder='Album ID'
+        value = {album}
+        onChange={(e) => setAlbum(e.target.value)}
+        placeholder='Album'
+        className="p-2 rounded bg-gray-700 text-white"
+        required/>
+      <input
+        value = {artist}
+        onChange={(e) => setArtist(e.target.value)}
+        placeholder='Artist'
         className="p-2 rounded bg-gray-700 text-white"
         required/>
       <Button type = "submit" className='mt-2'>
