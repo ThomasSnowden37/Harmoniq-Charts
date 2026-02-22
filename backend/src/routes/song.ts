@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabase.js'
+import { isDataView } from 'util/types'
 
 /**
  * TODO:
@@ -51,16 +52,6 @@ router.post('/add', async (req, res) => {
     if (!title || !bpm || !genre || !year_released || !album_name || !artist_name)
         return res.status(400).json({ error: 'Missing required fields' })
 
-    const { data: existing } = await supabase
-        .from('songs')
-        .select('*')
-        .eq('title', title)
-        .limit(1)
-
-    if (existing && existing.length > 0) {
-        return res.status(401).json({ error: 'Song already exists' })
-    }
-
     //check if the artist exists and if not create them
     let { data: artist } = await supabase
         .from('artists')
@@ -78,20 +69,34 @@ router.post('/add', async (req, res) => {
     const artist_id = artist?.id
 
     //check if the album exists and if not create it
-    let { data: album } = await supabase
+    let album_id: string | null = null
+    const { data: album } = await supabase
         .from('albums')
         .select('id')
         .eq('name', album_name)
-        .single()
-    if (!album) {
+
+    if (album && album.length > 0) {
+        const albumID = album.map(s => s.id)
+        //check if album is tied to artist or different artist
+        const { data: correctAlbum } = await supabase
+            .from('album_artists')
+            .select('album_id')
+            .in('album_id', albumID)
+            .eq('artist_id', artist_id)
+            .limit(1)
+        if (correctAlbum && correctAlbum.length > 0) {
+            album_id = correctAlbum[0].album_id
+        }
+    }    
+    if (!album_id) {
         const { data: Createalbum} = await supabase
             .from('albums')
             .insert({ name: album_name })
             .select()
             .single()
-        album = Createalbum
+        album_id = Createalbum.id
     }
-    const album_id = album?.id       
+    
     
     //check if album_artist relationship exists, if not create it
     //TODO: kind of weird right now, probably should have some sort of admin to check songs
@@ -112,8 +117,28 @@ router.post('/add', async (req, res) => {
         })
     }
 
-    //TODO: Check for duplicates based on Song Name and check artist
+    //Check if song added is a duplicate 
+    //Check if song is already in album and if it is tied to same arist
+    const { data: songsSameAlbum } = await supabase
+        .from('songs')
+        .select('id')
+        .eq('title', title)
+        .eq('album_id', album_id)
 
+    if (songsSameAlbum && songsSameAlbum.length > 0) {
+        const songsID = songsSameAlbum.map(s => s.id)
+
+        const { data: songsSameArtist } = await supabase
+            .from('song_artists')
+            .select('song_id')
+            .in('song_id', songsID)
+            .eq('artist_id', artist_id)
+            .limit(1)
+
+        if (songsSameArtist && songsSameArtist.length > 0 ) {
+            return res.status(409).json({error: 'This song has already been added'})
+        }
+    }
 
     //add song to the database and add song artist relationship
     //TODO: More error checking
