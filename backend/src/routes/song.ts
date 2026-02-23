@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabase.js'
-import { isDataView } from 'util/types'
 
 /**
  * TODO:
@@ -232,6 +231,147 @@ router.patch('/:id', async (req, res) => {
     res.json(data);
 })
 
+router.get('/:id/listened', async (req, res) => {
+    const songId = req.params.id;
+    //const userId = req.user.id;
+    const userId = '11111111-1111-1111-1111-111111111111'
 
+    if (!songId ) {
+        return res.status(400).json({ error: 'Song ID is required' })
+    }
+
+    const { data: existSong, error: noSong } = await supabase 
+        .from('songs')
+        .select('id')
+        .eq('id', songId)
+        .single()
+    if (noSong) {
+        return res.status(404).json({ error: 'Song is not found' })
+    }
+
+    if (!songId) return res.status(400).json({ error: 'song id is required' })
+
+    const { data, error } = await supabase
+        .from('listened')
+        .select('id')
+        .eq('song_id', songId)
+        .eq('user_id', songId)
+        .single()
+    if (error) {
+        return res.status(500).json({ error: 'Song not found'})
+    }
+    res.json(data)
+})
+
+/**
+ * Add a song to a users listened
+ */
+router.post('/:id/listened', async (req, res) => {
+     const songId = req.params.id;
+    //const userId = req.user.id;
+    const userId = '11111111-1111-1111-1111-111111111111'
+
+    if (!songId ) {
+        return res.status(400).json({ error: 'Song ID is required' })
+    }
+
+    const { data: existSong, error: noSong } = await supabase 
+        .from('songs')
+        .select('id')
+        .eq('song_id', songId)
+        .single()
+    if (noSong) {
+        return res.status(404).json({ error: 'Song is not found' })
+    }
+
+    const { data: existing, error: errorExisting } = await supabase
+        .from('listened')
+        .select('id')
+        .eq('id', songId)
+        .eq('user_id', songId)
+        .single()
+
+    if (existing) {
+        return res.status(409).json({ error: 'Already listened' })
+    }
+
+    const {data, error} = await supabase
+        .from('listened')
+        .insert({
+            user_id: userId,
+            song_id: songId 
+        })
+        .select()
+        .single()
+
+    if (error){
+        return res.status(500).json({ error: 'Failed to add song to listened'})
+    }
+    return res.status(201).json(data)
+})
+
+/**
+ * Remove a song to a users listened
+ */
+router.delete('/:id/listened', async (req, res) => {
+     const songId = req.params.id;
+    //const userId = req.user.id;
+    const userId = '11111111-1111-1111-1111-111111111111'
+
+    if (!songId ) {
+        return res.status(400).json({ error: 'Song ID is required' })
+    }
+
+    const { data: existSong, error: noSong } = await supabase 
+        .from('songs')
+        .select('id')
+        .eq('id', songId)
+        .single()
+    if (noSong) {
+        return res.status(404).json({ error: 'Song is not found' })
+    }
+
+    const { error } = await supabase
+        .from('listened')
+        .delete()
+        .eq('song_id', songId)
+        .eq('user_id', songId)
+        .single()
+
+    if (error) {
+        return res.status(500).json({ error: 'Failed to remove listened' })
+    }
+    res.json({ message: 'Successfully deleted' })
+})
+
+/**
+ * Get total listened to count
+ */
+router.get('/:id/listened/count', async (req, res) => {
+     const songId = req.params.id; 
+    
+      if (!songId ) {
+        return res.status(400).json({ error: 'Song ID is required' })
+    }
+    const { data: existSong, error: noSong } = await supabase 
+        .from('songs')
+        .select('id')
+        .eq('id', songId)
+        .single()
+    if (noSong) {
+        console.log("here68")
+        return res.status(404).json({ error: 'Song is not found' })
+    }
+    const {count, error} = await supabase
+        .from('listened')
+        .select('*', { count: 'exact', head: true})
+        .eq('song_id', songId)
+    
+     if (error) {
+        return res.status(500).json({ error: 'Failed to get count' })
+    }
+    res.json({ total: count || 0 })
+    
+})
 
 export default router

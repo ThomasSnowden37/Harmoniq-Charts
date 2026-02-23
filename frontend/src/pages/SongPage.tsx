@@ -34,10 +34,11 @@ export default function SongPage() {
     const [error, setError] = useState<string | null>(null)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
+    const [listenedCount, setListenedCount] = useState(0)
 
 
     useEffect(() => {
-        async function fetchSong() {
+        async function fetchSongAndListened() {
         try {
             //songs/{song uuid}
             const res = await fetch(`http://localhost:3001/api/songs/${id}`)
@@ -45,11 +46,16 @@ export default function SongPage() {
 
             if (!res.ok) setError(`Error: ${data.error}`)
             setSong(data)
+
+            const countRes = await fetch(`http://localhost:3001/api/songs/${id}/listened/count`)
+            const countData = await countRes.json()
+            if (!countRes.ok) setError(`Error: ${data.error}`)
+            setListenedCount(countData.total)
         } finally {
             setLoading(false)
         }
     }
-    if (id) fetchSong()
+    if (id) fetchSongAndListened()
   }, [id])
 
   if (loading) return <p className="text-white p-6">Loading...</p>
@@ -63,6 +69,9 @@ export default function SongPage() {
       <p>BPM: {song.bpm}</p>
       <p>Genre: {song.genre}</p>
       <p>Year: {song.year_released}</p>
+
+      {/*  Total listeners */}
+      <p> Listeners: {listenedCount}</p>
 
       {/* Delete button */}
       <button
