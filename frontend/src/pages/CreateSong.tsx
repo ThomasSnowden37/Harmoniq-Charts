@@ -15,9 +15,7 @@ import {
 
 /**
  * TODO:
- * Add Deleting, and Editing own songs
- * Change album id to name 
- * Add artist when i put in song db
+ * Add Editing own songs 
  * Make more navigable 
  * Make Error Codes better for users
  */
@@ -45,7 +43,7 @@ export default function CreateSong() {
  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-        const res = await fetch('http://localhost:3001/api/song/add', {
+        const res = await fetch('http://localhost:3001/api/songs/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-user-id': MOCK_CURRENT_USER_ID,},
           body: JSON.stringify({

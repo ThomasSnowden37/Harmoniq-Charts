@@ -18,7 +18,7 @@ app.use(express.json())
 // Define all routes in the routes subfolder here
 app.use('/api/friend-requests', friendRequestsRouter)
 app.use('/api/users', usersRouter)
-app.use('/api/song', songRouter)
+app.use('/api/songs', songRouter)
 
 // Test the supabase connection with this endpoint
 app.get('/api/test-db', async (req, res) => {

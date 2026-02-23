@@ -27,7 +27,6 @@ const router = Router()
  */
 router.get('/:id', async (req, res) => {
     const songId = req.params.id
-
     if (!songId) return res.status(400).json({ error: 'song id is required' })
 
     const { data, error } = await supabase
@@ -35,7 +34,6 @@ router.get('/:id', async (req, res) => {
         .select('*')
         .eq('id', songId)
         .single()
-
     if (error) {
         return res.status(500).json({ error: 'Song not found'})
     }
@@ -164,5 +162,35 @@ router.post('/add', async (req, res) => {
         })
     res.status(201).json(song)
 })
+/**
+ * Delete a song
+ */
+router.delete('/:id', async (req, res) => {
+     const songId = req.params.id;
+     console.log('Deleting song:', songId);
 
+    if (!songId ) {
+        return res.status(400).json({ error: 'Song ID is required' })
+    }
+
+    //check if the song exists
+    const { data: existSong, error: noSong } = await supabase 
+        .from('songs')
+        .select('id')
+        .eq('id',songId )
+        .single()
+    if (noSong) {
+        return res.status(404).json({ error: 'Song is not found' })
+    }
+    //delete the song
+    const { error : deleteError } = await supabase
+        .from('songs')
+        .delete()
+        .eq('id',songId )
+    if (deleteError) {
+       return res.status(500).json({ error: deleteError.message }) 
+    }
+
+    res.status(201).json({ message: 'Song deleted successfully'})
+})
 export default router

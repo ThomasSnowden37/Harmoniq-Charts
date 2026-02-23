@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import UserProfile from './pages/UserProfile'
 import LandingPage from './pages/LandingPage'
 import CreateSong from './pages/CreateSong'
+import SongPage from './pages/SongPage'
 
 
 // Define routes to various pages here
@@ -12,6 +13,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/user/:userId" element={<UserProfile />} />
         <Route path="/songs/add" element={<CreateSong  />} />
+        <Route path="/songs/:id" element={<SongPage  />} />
       </Routes>
     </BrowserRouter>
   )
