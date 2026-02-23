@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { MOCK_CURRENT_USER_ID } from '../lib/auth' //need to get acutal auths
 import { useParams } from 'react-router-dom'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
+import EditSongModal from '../features/songs/components/EditSongModal'
 
 
 //Super basic placeholder
 //TODO: Make page look good
+//TODO: Edit and Delete only for who created - need auths
 
 /**
  * SongPage.tsx
@@ -31,6 +33,7 @@ export default function SongPage() {
     const [song, setSong] = useState<Song | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [deleteOpen, setDeleteOpen] = useState(false)
+    const [editOpen, setEditOpen] = useState(false)
 
 
     useEffect(() => {
@@ -68,13 +71,25 @@ export default function SongPage() {
       >
         Delete Song
       </button>
-
+      {/* Edit button */}
+      <button
+        onClick={() => setEditOpen(true)}
+        className="mt-6 px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-500"
+      >
+        Edit Song
+      </button>
       <DeleteSongModal
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         songId={song.id}
         songTitle={song.title}
         onDeleted={() => setSong(null)}
+      />
+      <EditSongModal
+        isOpen={editOpen}
+        onClose={() => setEditOpen(false)}
+        song={song}
+        onUpdated={(updated) => setSong(updated)}
       />
     </div>
   )

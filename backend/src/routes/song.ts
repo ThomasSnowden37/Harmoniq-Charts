@@ -6,7 +6,6 @@ import { isDataView } from 'util/types'
  * TODO:
  * Add Deleting, and Editing own songs
  * Add user_id to songs DB for when user creates a song
- * Use album and artist id to find duplicates 
  * Check for more errors
  */
 
@@ -162,12 +161,13 @@ router.post('/add', async (req, res) => {
         })
     res.status(201).json(song)
 })
+
+
 /**
  * Delete a song
  */
 router.delete('/:id', async (req, res) => {
-     const songId = req.params.id;
-     console.log('Deleting song:', songId);
+     const songId = req.params.id
 
     if (!songId ) {
         return res.status(400).json({ error: 'Song ID is required' })
@@ -193,4 +193,45 @@ router.delete('/:id', async (req, res) => {
 
     res.status(201).json({ message: 'Song deleted successfully'})
 })
+
+/**
+ * Edit a song
+ */
+router.patch('/:id', async (req, res) => {
+    const songId = req.params.id
+    const {title, bpm, genre, year_released} = req.body
+    if (!songId ) {
+        return res.status(400).json({ error: 'Song ID is required' })
+    }
+
+    if (bpm != null && (typeof bpm != 'number' || bpm < 0)) {
+        return res.status(400).json({ error: 'Invalid BPM' })
+    }
+    if (year_released != null && (typeof year_released != 'number' || year_released < 0)) {
+        return res.status(400).json({ error: 'Invalid Year' })
+    }
+    //check if the song exists
+    const { data: existSong, error: noSong } = await supabase 
+        .from('songs')
+        .select('id')
+        .eq('id',songId )
+        .single()
+    if (noSong) {
+        return res.status(404).json({ error: 'Song is not found' })
+    }
+
+    const{ data, error: errorUpdate} = await supabase
+        .from('songs')
+        .update({ title, bpm, genre, year_released })
+        .eq('id', songId)
+        .select()
+        .single()
+    if (errorUpdate) {
+        return res.status(500).json({ error: 'Failed to update song' })
+    }
+    res.json(data);
+})
+
+
+
 export default router
