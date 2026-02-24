@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MOCK_CURRENT_USER_ID } from '../lib/auth' //need to get acutal auths
+import { Form } from "radix-ui";
 import {
   Avatar,
   Badge,
@@ -12,10 +13,11 @@ import {
   Tabs,
   Text,
 } from '@radix-ui/themes'
+import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
 /**
  * TODO:
- * Add Editing own songs 
  * Make more navigable 
  * Make Error Codes better for users
  */
@@ -31,17 +33,23 @@ import {
  */
 
 export default function CreateSong() {
-  const [title, setTitle] = useState('')
-  const [bpm, setBpm] = useState('')
-  const [genre, setGenre] = useState('')
-  const [yearreleased, setYearReleased] = useState('')
-  const [album, setAlbum] = useState('')
-  const [artist, setArtist] = useState('')
-  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
 
 
- const handleSubmit = async (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    setLoading(true)
+    setMessage(null)
+    
+    const forms = e.currentTarget
+    const form = new FormData(e.currentTarget)
+    const title = form.get('title')?.toString() ?? ''
+    const bpm = Number(form.get('bpm') ?? 0)
+    const genre = form.get('genre')?.toString() ?? ''
+    const year_released = Number(form.get('year_released') ?? 0)
+    const album_name = form.get('album')?.toString() ?? ''
+    const artist_name = form.get('artist')?.toString() ?? ''
     try {
         const res = await fetch('http://localhost:3001/api/songs/add', {
           method: 'POST',
@@ -49,86 +57,176 @@ export default function CreateSong() {
           body: JSON.stringify({
           userId: MOCK_CURRENT_USER_ID,
           title,
-          bpm: Number(bpm),
+          bpm,
           genre,
-          year_released: Number(yearreleased),
-          album_name: album,
-          artist_name: artist
+          year_released,  
+          album_name,
+          artist_name,
         }),
       })
       const data = await res.json()
 
-      if (!res.ok) setError(`Error: ${data.error}`)
-      else {
-        setError(`${data.title} added successfully`)
-        setTitle('')
-        setBpm('')
-        setGenre('')
-        setYearReleased('')
-        setAlbum('')
-        setArtist('')
-      }
+      if (!res.ok) throw new Error(data.error || 'Failed to add song')
+
+      forms.reset()
+      setMessage('Song Successfully Added')
 
     } catch (err: any) {
       console.error('Request failed:', err)
-      setError(`Request failed: ${err.message}`)
+      setMessage(`Request failed: ${err.message}`)
+    } finally {
+      setLoading(false)
     }
   } 
 
 return (
-  <Box className='min-h-screen bg-gray-900 flex items-center justify-center p-4'>
-    <Card size="3" className="w-full max-w-md p-6">
-      <Heading size="5" className="mb-4 text-white">
+  <Box className="min-h-screen bg-white flex flex-col">
+    <Navbar />
+    <Box className="flex-1 flex items-center justify-center p-6">
+    <Card size="3" className="w-full max-w-xl p-6">
+      <Heading size="6" mb="5">
         Add New Song
       </Heading>
 
-    <form onSubmit={handleSubmit} className='flex flex-col gap-3'>
-      <input
-        value = {title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder='Title'
-        className="p-2 rounded bg-gray-700 text-white"
-        required/>
-      <input
-        value = {bpm}
-        onChange={(e) => setBpm(e.target.value)}
-        placeholder='Bpm'
-        className="p-2 rounded bg-gray-700 text-white"
-        required/>
-      <input
-        value = {genre}
-        onChange={(e) => setGenre(e.target.value)}
-        placeholder='Genre'
-        className="p-2 rounded bg-gray-700 text-white"
-        required/>
-      <input
-        value = {yearreleased}
-        onChange={(e) => setYearReleased(e.target.value)}
-        placeholder='Year Released'
-        className="p-2 rounded bg-gray-700 text-white"
-        required/>
-      <input
-        value = {album}
-        onChange={(e) => setAlbum(e.target.value)}
-        placeholder='Album'
-        className="p-2 rounded bg-gray-700 text-white"
-        required/>
-      <input
-        value = {artist}
-        onChange={(e) => setArtist(e.target.value)}
-        placeholder='Artist'
-        className="p-2 rounded bg-gray-700 text-white"
-        required/>
-      <Button type = "submit" className='mt-2'>
-        Add Song</Button>
-    </form>
-    {error && (
-      <Text size="2" color="blue" className="mt-3">
-        {error}</Text>
-    )}
-    </Card>
-  </Box>
-)
+    <Form.Root asChild>
+      <form onSubmit={handleSubmit} onChange={() => message && setMessage(null)}>
+        {/* Title */}
+        <Form.Field name="title" className="mb-4">
+            <Form.Label className="FormLabel text-black mb-1">
+              Title</Form.Label>
+            <Form.Control asChild>
+              <input
+                name="title"
+                className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
+                 data-[invalid]:data-[touched]:border-red-600 
+                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                required  />
+              </Form.Control>
+              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+                Please enter a title
+              </Form.Message>
+            </Form.Field>
+
+         {/* bpm */}
+        <Form.Field name="bpm" className="mb-4">
+            <Form.Label className="FormLabel text-black mb-1">
+                BPM</Form.Label>
+              <Form.Control asChild>
+                <input
+                  name="bpm"
+                  type="number"
+                  min={0}
+                  className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
+                 data-[invalid]:data-[touched]:border-red-600 
+                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                  required  
+                />
+              </Form.Control>
+              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+                Please enter the BPM
+              </Form.Message>
+              <Form.Message match="rangeUnderflow" className="text-red-400 text-sm mt-1">
+                BPM must be greater than 0
+            </Form.Message>
+            </Form.Field>
+
+            {/* Genre */} 
+         <Form.Field name="genre" className="mb-4">
+            <Form.Label className="FormLabel text-black mb-1">
+                Genre</Form.Label>
+              <Form.Control asChild>
+                <input
+                  name="genre"
+                  className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
+                  data-[invalid]:data-[touched]:border-red-600 
+                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                  required  
+                />
+              </Form.Control>
+              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+                Please enter a Genre
+              </Form.Message>
+            </Form.Field>
+
+         {/* Year Released  */}    
+        <Form.Field name="year_released" className="mb-4">
+            <Form.Label className="FormLabel text-black mb-1">
+                Year Released</Form.Label>
+              <Form.Control asChild>
+                <input
+                  name="year_released"
+                  type="number"
+                  min={0}
+                  className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
+                 data-[invalid]:data-[touched]:border-red-600 
+                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                  required  
+                />
+              </Form.Control>
+              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+                Please enter a Year
+              </Form.Message>
+              <Form.Message match="rangeUnderflow" className="text-red-400 text-sm mt-1">
+                Year must be greater than 0
+            </Form.Message>
+            </Form.Field>
+
+         {/* Album */}    
+        <Form.Field name="album" className="mb-4">
+            <Form.Label className="FormLabel text-black mb-1">
+              Album</Form.Label>
+            <Form.Control asChild>
+              <input
+                name="album"
+                className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
+                 data-[invalid]:data-[touched]:border-red-600 
+                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                required  />
+              </Form.Control>
+              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+                Please enter an album
+              </Form.Message>
+            </Form.Field>
+
+         {/* Artist */}    
+        <Form.Field name="artist" className="mb-4">
+            <Form.Label className="FormLabel text-black mb-1">
+              Artist</Form.Label>
+            <Form.Control asChild>
+              <input
+                name="artist"
+                className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
+                 data-[invalid]:data-[touched]:border-red-600 
+                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                required  />
+              </Form.Control>
+              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+                Please enter an artist
+              </Form.Message>
+            </Form.Field>
+          
+           {/* Buttons */}
+           <Flex justify="end" gap="2" mt="4">
+            <Button
+                type="submit"
+                disabled={loading}
+                className={`px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 ${
+                loading ? 'opacity-70 cursor-wait' : ''
+                }`}>
+                {loading ? 'Adding…' : 'Add Song'}
+              </Button>
+            </Flex>
+          </form>
+        </Form.Root>
+        {message && (
+          <Text size="2" mt="3" color="blue">
+            {message}
+          </Text> )}
+      </Card>     
+      </Box> 
+        <Footer />
+    </Box>
+  )
 }
 
 
