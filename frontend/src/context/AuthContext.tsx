@@ -64,6 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           setUser(googleUser);
           setRealUserId(googleUser.id); // Updates the global ID for components
+
+          window.location.reload();
         }
       } catch (err) {
         console.error("Backend sync failed", err);
@@ -72,9 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    setUser(null);
-    setRealUserId('11111111-1111-1111-1111-111111111111');
-  };
+  setUser(null);
+  setRealUserId('11111111-1111-1111-1111-111111111111');
+  
+  // Force a full page refresh to clear all component states
+  window.location.href = '/'; // This redirects to home and reloads the app
+};
 
   return (
     <AuthContext.Provider value={{ user, login, logout }}>
