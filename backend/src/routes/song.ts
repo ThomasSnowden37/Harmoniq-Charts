@@ -258,11 +258,12 @@ router.patch('/:id', async (req, res) => {
     }
 })
 
+/**
+ * Get if listened to or not
+ */
 router.get('/:id/listened', async (req, res) => {
     const songId = req.params.id;
-    //const userId = req.user.id;
-    const userId = '11111111-1111-1111-1111-111111111111'
-
+    const userId = req.headers['x-user-id'] as string
     if (!songId ) {
         return res.status(400).json({ error: 'Song ID is required' })
     }
@@ -276,18 +277,14 @@ router.get('/:id/listened', async (req, res) => {
         return res.status(404).json({ error: 'Song is not found' })
     }
 
-    if (!songId) return res.status(400).json({ error: 'song id is required' })
-
     const { data, error } = await supabase
         .from('listened')
         .select('id')
         .eq('song_id', songId)
-        .eq('user_id', songId)
+        .eq('user_id', userId)
         .single()
-    if (error) {
-        return res.status(500).json({ error: 'Song not found'})
-    }
-    res.json(data)
+    const listened = !!data
+    res.json({ listened })
 })
 
 /**
@@ -295,8 +292,7 @@ router.get('/:id/listened', async (req, res) => {
  */
 router.post('/:id/listened', async (req, res) => {
      const songId = req.params.id;
-    //const userId = req.user.id;
-    const userId = '11111111-1111-1111-1111-111111111111'
+     const userId = req.headers['x-user-id'] as string
 
     if (!songId ) {
         return res.status(400).json({ error: 'Song ID is required' })
@@ -305,7 +301,7 @@ router.post('/:id/listened', async (req, res) => {
     const { data: existSong, error: noSong } = await supabase 
         .from('songs')
         .select('id')
-        .eq('song_id', songId)
+        .eq('id', songId)
         .single()
     if (noSong) {
         return res.status(404).json({ error: 'Song is not found' })
@@ -315,7 +311,7 @@ router.post('/:id/listened', async (req, res) => {
         .from('listened')
         .select('id')
         .eq('id', songId)
-        .eq('user_id', songId)
+        .eq('user_id', userId)
         .single()
 
     if (existing) {
@@ -341,9 +337,9 @@ router.post('/:id/listened', async (req, res) => {
  * Remove a song to a users listened
  */
 router.delete('/:id/listened', async (req, res) => {
-     const songId = req.params.id;
-    //const userId = req.user.id;
-    const userId = '11111111-1111-1111-1111-111111111111'
+    const songId = req.params.id;
+    const userId = req.headers['x-user-id'] as string
+        console.log("add")
 
     if (!songId ) {
         return res.status(400).json({ error: 'Song ID is required' })
@@ -362,7 +358,7 @@ router.delete('/:id/listened', async (req, res) => {
         .from('listened')
         .delete()
         .eq('song_id', songId)
-        .eq('user_id', songId)
+        .eq('user_id', userId)
         .single()
 
     if (error) {
