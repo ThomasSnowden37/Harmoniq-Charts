@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabase.js'
+import { isFriend } from './friends.js'
 
 /**
  * users.ts
@@ -37,14 +38,8 @@ router.get('/:id', async (req, res) => {
 
   // Private profile — check if the viewer is friends with this user
   if (viewerId) {
-    const { data: friendship } = await supabase
-      .from('friend_requests')
-      .select('id')
-      .eq('status', 'accepted')
-      .or(`and(requester_id.eq.${viewerId},addressee_id.eq.${profileId}),and(requester_id.eq.${profileId},addressee_id.eq.${viewerId})`)
-      .maybeSingle()
-
-    if (friendship) {
+    const isFriendFlag = await isFriend(viewerId, profileId)
+    if (isFriendFlag) {
       return res.json(data)
     }
   }

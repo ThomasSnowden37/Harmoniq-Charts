@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabase.js'
+import { isFriend} from './friends.js'
 
 const router = Router()
 
@@ -32,17 +33,6 @@ router.get('/user/:userId', async (req, res) => {
   res.json(playlists.map(p => ({ ...p, song_count: countMap.get(p.id) || 0 })))
 })
 
-// Helper to check if users are friends
-async function areFriends(userId1: string, userId2: string): Promise<boolean> {
-  const { data } = await supabase
-    .from('friend_requests')
-    .select('id')
-    .eq('status', 'accepted')
-    .or(`and(requester_id.eq.${userId1},addressee_id.eq.${userId2}),and(requester_id.eq.${userId2},addressee_id.eq.${userId1})`)
-    .limit(1)
-  return (data?.length ?? 0) > 0
-}
-
 // Helper to check if a user can access a playlist (based on privacy)
 async function canAccessPlaylist(playlistId: string, requesterId: string | undefined): Promise<{ allowed: boolean; playlist?: any }> {
   const { data: playlist } = await supabase
@@ -59,8 +49,8 @@ async function canAccessPlaylist(playlistId: string, requesterId: string | undef
   const isOwner = requesterId === playlist.user_id
   if (isOwner) return { allowed: true, playlist }
 
-  const isFriend = requesterId ? await areFriends(requesterId, playlist.user_id) : false
-  return { allowed: isFriend, playlist }
+  const isFriendFlag = requesterId ? await isFriend(requesterId, playlist.user_id) : false
+  return { allowed: isFriendFlag, playlist }
 }
 
 // Get playlist by ID with songs
@@ -80,8 +70,8 @@ router.get('/:id', async (req, res) => {
   const ownerPrivacy = (playlist.users as any)?.privacy
   if (ownerPrivacy === 'private') {
     const isOwner = requesterId === playlist.user_id
-    const isFriend = requesterId ? await areFriends(requesterId, playlist.user_id) : false
-    if (!isOwner && !isFriend) {
+    const isFriendFlag = requesterId ? await isFriend(requesterId, playlist.user_id) : false
+    if (!isOwner && !isFriendFlag) {
       return res.status(403).json({ error: 'This playlist belongs to a private account' })
     }
   }
