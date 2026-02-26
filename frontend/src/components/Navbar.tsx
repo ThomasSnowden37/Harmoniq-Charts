@@ -17,6 +17,11 @@ export default function Navbar() {
             <Text size="2" className="text-gray-900 tracking-tight">Song Lookup</Text>
           </div>
         </Link>
+        <Link to="/songs/add" className="no-underline">
+          <div className="border-4 border-solid px-4 rounded-md">
+            <Text size="2" className="text-gray-900 tracking-tight">Add Song</Text>
+          </div>
+        </Link>
         <Flex gap="3" align="center">
           {user ? (
             <Flex gap="3" align="center">
