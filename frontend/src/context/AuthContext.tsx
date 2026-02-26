@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { CredentialResponse } from '@react-oauth/google';
 import { v5 as uuidv5 } from 'uuid';
@@ -22,7 +22,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<GoogleUser | null>(null);
+  const [user, setUser] = useState<GoogleUser | null>(() => {
+    const stored = localStorage.getItem('harmoniq_user');
+    return stored ? JSON.parse(stored) : null;
+  });
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('harmoniq_user', JSON.stringify(user));
+      setRealUserId(user.id);
+    } else {
+      localStorage.removeItem('harmoniq_user');
+    }
+  }, [user]);
 
   const login = async (credentialResponse: CredentialResponse) => {
     if (credentialResponse.credential) {
@@ -61,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null);
-    setRealUserId('11111111-1111-1111-1111-111111111111'); // Reset to mock ID on logout
+    setRealUserId('11111111-1111-1111-1111-111111111111');
   };
 
   return (
