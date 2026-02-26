@@ -12,6 +12,11 @@ export default function Navbar() {
         <Link to="/" className="no-underline">
           <Text size="5" weight="bold" className="text-gray-900 tracking-tight">Harmoniq</Text>
         </Link>
+        <Link to="/search" className="no-underline">
+          <div className="border-4 border-solid px-4 rounded-md">
+            <Text size="2" className="text-gray-900 tracking-tight">Song Lookup</Text>
+          </div>
+        </Link>
         <Flex gap="3" align="center">
           {user ? (
             <Flex gap="3" align="center">

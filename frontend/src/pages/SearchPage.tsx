@@ -9,7 +9,7 @@ import { ArrowRight } from "lucide-react";
 export default function SearchPage() {
   const [query, setQuery] = useState('');
   const [column, setColumn] = useState<
-  'title' | 'artist' | 'album' | 'genre' | 'bpm' | 'song_writer' | 'singles_by_artist'
+  'title' | 'artist' | 'album' | 'genre' | 'bpm' | 'songwriter' | 'singles_by_artist'
   >('title');
   const [songs, setSongs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,9 +24,9 @@ export default function SearchPage() {
     setLoading(true);
 
     let data, error;
-      // BPM searches for exact numbers
+      // BPM searches close by
       if (column === 'bpm') {
-        const bpmQuery = parseInt(query, 10);
+        const bpmQuery = parseInt(query.replace(/\D/g, ''), 10);
         if (isNaN(bpmQuery)) {
           setSongs([]);
           setLoading(false);
@@ -43,9 +43,10 @@ export default function SearchPage() {
             )
           `)
           .eq('bpm', bpmQuery)
-          .order('title', {ascending: true}));
+          .order('title', { ascending: true }));
 
-      } 
+        if (error) console.error("BPM search error:", error);
+      }
       // Album needs to connect to the other tables rather than song
       else if (column === 'album') {
         ({ data, error } = await supabase
@@ -80,39 +81,19 @@ export default function SearchPage() {
       } 
       // Checks the connected artist through the song data
       else if (column === 'artist') {
-        const { data: songArtistData, error: artistError } = await supabase
-          .from('song_artists')
+        ({ data, error } = await supabase
+          .from('songs')
           .select(`
-            song_id,
-            songs (
-              *,
-              song_artists (
-                artists (*)
-              )
+            *,
+            song_artists!inner (
+              artists!inner (*)
             ),
-            artists!inner (*)
+            albums (*)
           `)
-          .ilike('artists.name', `%${query}%`)
-          .order('title', {ascending: true});
-
-        if (artistError) {
-          console.error(artistError);
-          setSongs([]);
-          setLoading(false);
-          return;
-        }
-
-        // Extract unique songs
-        const uniqueSongs = songArtistData
-          ?.map((sa: any) => sa.songs)
-          .filter((song: any, index: number, self: any[]) =>
-            index === self.findIndex((s) => s.id === song.id)
-          );
-
-        setSongs(uniqueSongs || []);
-        setLoading(false);
-        return;
-      } 
+          .ilike('song_artists.artists.name', `%${query}%`)
+          .order('title', { ascending: true })
+        );
+      }
       else {
 
         ({ data, error } = await supabase
@@ -161,7 +142,7 @@ export default function SearchPage() {
     <Navbar />
       <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
         <div className="w-full max-w-2xl mx-4 bg-white rounded-2xl shadow-xl p-8">
-          <h1 className="text-3xl font-semibold text-center mb-2">Song Lookup</h1>
+          <h1 className="text-3xl font-semibold text-center mb-2 text-blue-600">Song Lookup</h1>
           <p className="text-center text-gray-500 mb-6">
             Use the dropdown menu to select what to search by
           </p>
@@ -190,7 +171,7 @@ export default function SearchPage() {
               <option value="album">Album</option>
               <option value="genre">Genre</option>
               <option value="bpm">BPM</option>
-              <option value="song_writer">Song Writers</option>
+              <option value="songwriter">Songwriters</option>
               <option value="singles_by_artist">Singles by Artist</option>
             </select>
 
@@ -234,13 +215,14 @@ export default function SearchPage() {
                                   </span>
                                 ))}
                                 </div>
-                              <div className="flex-1 min-w-[200px]">Song Writer(s): {renderBold(song.song_writer, "song_writer")} </div>
+                              <div className="flex-1 min-w-[200px]">Songwriter(s): {renderBold(song.songwriter, "songwriter")} </div>
                               <div className="flex-1 min-w-[120px]">Album: {renderBold(song.albums?.name ?? "Single", "album")} </div>
                           </div>      
 
                           <div className="flex flex-wrap gap-4">
                               <div className="flex-1">Genre: {renderBold(song.genre, "genre")} </div>
                               <div className="flex-1">Bpm: {renderBold(song.bpm, "bpm")}</div>
+                              <div className="flex-1"></div>
                           </div>
                         </div>
                       </div>
