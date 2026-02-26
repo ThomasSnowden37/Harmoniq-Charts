@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { resolvePath, useParams } from 'react-router-dom'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
 import { useAuth } from '../context/AuthContext';
+import { REALTIME_PRESENCE_LISTEN_EVENTS } from '@supabase/supabase-js'
 
 
 //Super basic placeholder
@@ -39,6 +40,7 @@ export default function SongPage() {
     const [editOpen, setEditOpen] = useState(false)
     const [playlistOpen, setPlaylistOpen] = useState(false)
     const [listenedCount, setListenedCount] = useState(0)
+    const [listened, setListened] = useState(false)
 
 
     useEffect(() => {
@@ -47,15 +49,26 @@ export default function SongPage() {
             //songs/{song uuid}
             const res = await fetch(`http://localhost:3001/api/songs/${id}`)
             const data = await res.json()
-
             if (!res.ok) setError(`Error: ${data.error}`)
             setSong(data)
+
+            if (user) {
+              const resLis = await fetch(`http://localhost:3001/api/songs/${id}/listened`, {
+                headers: { 'x-user-id': user.id }
+              })
+               const listenedData = await resLis.json()
+              if (!resLis.ok) setError(`Error: ${listenedData.error || 'Failed to fetch listened status'}`)
+              else setListened(listenedData.listened)
+            }
 
             const countRes = await fetch(`http://localhost:3001/api/songs/${id}/listened/count`)
             const countData = await countRes.json()
             if (!countRes.ok) setError(`Error: ${data.error}`)
             setListenedCount(countData.total)
-        } finally {
+        } catch (err: any) {
+          console.error(err.message)
+        } 
+        finally {
             setLoading(false)
         }
     }
@@ -120,6 +133,30 @@ export default function SongPage() {
         onClose={() => setPlaylistOpen(false)}
         songId={song.id}
       />
+    <button
+      onClick={async () => {
+      if (!user) return alert("You must be logged in to mark as listened")
+      try {
+      const method = listened ? 'DELETE' : 'POST'
+      const res = await fetch(`http://localhost:3001/api/songs/${id}/listened`, {
+        method,
+        headers: { 'x-user-id': user.id }
+      })
+      const data = await res.json()   
+      if (res.ok) {
+        setListened(!listened)
+      } else {
+        console.error(data.error)
+      }
+    } catch (err: any) {
+      console.error(err.message)
+    }
+  }}
+  className={`mt-4 px-4 py-2 rounded-lg text-black font-semibold ${
+     listened ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 hover:bg-gray-500'}`}
+>
+    {listened ? 'Listened' : 'Mark as Listened'}
+  </button>
     </div>
   )
 }
