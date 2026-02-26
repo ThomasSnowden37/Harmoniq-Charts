@@ -41,6 +41,7 @@ export default function SongPage() {
     const [playlistOpen, setPlaylistOpen] = useState(false)
     const [listenedCount, setListenedCount] = useState(0)
     const [listened, setListened] = useState(false)
+    const [listento, setListento] = useState(false)
 
 
     useEffect(() => {
@@ -59,6 +60,15 @@ export default function SongPage() {
                const listenedData = await resLis.json()
               if (!resLis.ok) setError(`Error: ${listenedData.error || 'Failed to fetch listened status'}`)
               else setListened(listenedData.listened)
+            }
+
+            if (user) {
+              const toLis = await fetch(`http://localhost:3001/api/songs/${id}/listento`, {
+                headers: { 'x-user-id': user.id }
+              })
+               const listentoData = await toLis.json()
+              if (!toLis.ok) setError(`Error: ${listentoData.error || 'Failed to fetch listen to status'}`)
+              else setListento(listentoData.listento)
             }
 
             const countRes = await fetch(`http://localhost:3001/api/songs/${id}/listened/count`)
@@ -156,6 +166,30 @@ export default function SongPage() {
      listened ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 hover:bg-gray-500'}`}
 >
     {listened ? 'Listened' : 'Mark as Listened'}
+  </button>
+  <button
+      onClick={async () => {
+      if (!user) return alert("You must be logged in to mark as listen to")
+      try {
+      const method = listento? 'DELETE' : 'POST'
+      const res = await fetch(`http://localhost:3001/api/songs/${id}/listento`, {
+        method,
+        headers: { 'x-user-id': user.id }
+      })
+      const data = await res.json()   
+      if (res.ok) {
+        setListento(!listento)
+      } else {
+        console.error(data.error)
+      }
+    } catch (err: any) {
+      console.error(err.message)
+    }
+  }}
+  className={`mt-4 px-4 py-2 rounded-lg text-black font-semibold ${
+     listento ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 hover:bg-gray-500'}`}
+>
+    {listento ? 'Listen To' : 'Mark as Listen To'}
   </button>
     </div>
   )

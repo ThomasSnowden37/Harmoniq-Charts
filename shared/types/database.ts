@@ -209,6 +209,29 @@ export interface Database {
           created_at?: string
         }
       }
+      listento: {
+        Row: {
+          id: string
+          user_id: string
+          song_id: string
+          add_listento: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          song_id: string
+          add_listento?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          song_id?: string
+          add_listento: boolean
+          created_at?: string
+        }
+      }
       playlists: {
         Row: {
           id: string

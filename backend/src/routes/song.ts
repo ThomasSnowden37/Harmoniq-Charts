@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabase.js'
+import { generateKey } from 'crypto'
 
 /**
  * TODO:
@@ -19,6 +20,46 @@ import { supabase } from '../lib/supabase.js'
  */
 
 const router = Router()
+
+
+/**
+ * Get all listened to for user
+ */
+router.get('/listentolist', async (req, res) => {
+    console.log("here67")
+    const userId = req.headers['x-user-id'] as string
+    if (!userId ) {
+        return res.status(400).json({ error: 'User is required to be logged in' })
+    }
+
+    try {
+        const { data: songsTo, error } = await supabase
+            .from('listento')
+            .select('song_id')
+            .eq('user_id', userId)
+
+        if (error) {
+            return res.status(500).json ({ error: "Failed to get listen to songs"})
+        }
+
+        const songIds = songsTo.map((r) => r.song_id)
+
+        if (songIds.length == 0) {
+            return res.json({ songs: [] })
+        }
+        const { data: songs, error: songsError} = await supabase
+            .from('songs')
+            .select('id, title, genre, bpm, year_released')
+            .in('id', songIds)
+        
+        if (songsError) {
+            return res.status(500).json ({ error: "Failed to get listen to songs"})
+        }
+        res.json({ songs })
+    } catch (err) {
+        res.status(500).json ({ error: "Error"})
+    }
+})
 
 /**
  * Get song details by id
@@ -287,6 +328,7 @@ router.get('/:id/listened', async (req, res) => {
     res.json({ listened })
 })
 
+
 /**
  * Add a song to a users listened
  */
@@ -310,7 +352,7 @@ router.post('/:id/listened', async (req, res) => {
     const { data: existing, error: errorExisting } = await supabase
         .from('listened')
         .select('id')
-        .eq('id', songId)
+        .eq('song_id', songId)
         .eq('user_id', userId)
         .single()
 
@@ -359,7 +401,7 @@ router.delete('/:id/listened', async (req, res) => {
         .delete()
         .eq('song_id', songId)
         .eq('user_id', userId)
-        .single()
+
 
     if (error) {
         return res.status(500).json({ error: 'Failed to remove listened' })
@@ -396,5 +438,112 @@ router.get('/:id/listened/count', async (req, res) => {
     res.json({ total: count || 0 })
     
 })
+/**
+ * Get if listened to or not
+ */
+router.get('/:id/listento', async (req, res) => {
+    const songId = req.params.id;
+    const userId = req.headers['x-user-id'] as string
+    if (!songId ) {
+        return res.status(400).json({ error: 'Song ID is required' })
+    }
+
+    const { data: existSong, error: noSong } = await supabase 
+        .from('songs')
+        .select('id')
+        .eq('id', songId)
+        .single()
+    if (noSong) {
+        return res.status(404).json({ error: 'Song is not found' })
+    }
+
+    const { data, error } = await supabase
+        .from('listento')
+        .select('id')
+        .eq('song_id', songId)
+        .eq('user_id', userId)
+        .single()
+    const listento = !!data
+    res.json({ listento })
+})
+
+/**
+ * Add a song to a users listen to
+ */
+router.post('/:id/listento', async (req, res) => {
+     const songId = req.params.id;
+     const userId = req.headers['x-user-id'] as string
+
+    if (!songId ) {
+        return res.status(400).json({ error: 'Song ID is required' })
+    }
+
+    const { data: existSong, error: noSong } = await supabase 
+        .from('songs')
+        .select('id')
+        .eq('id', songId)
+        .single()
+    if (noSong) {
+        return res.status(404).json({ error: 'Song is not found' })
+    }
+
+    const { data: existing, error: errorExisting } = await supabase
+        .from('listento')
+        .select('id')
+        .eq('song_id', songId)
+        .eq('user_id', userId)
+        .single()
+
+    if (existing) {
+        return res.status(409).json({ error: 'Already listened' })
+    }
+
+    const {data, error} = await supabase
+        .from('listento')
+        .insert({
+            user_id: userId,
+            song_id: songId 
+        })
+        .select()
+        .single()
+
+    if (error){
+        return res.status(500).json({ error: 'Failed to add song to listento'})
+    }
+    return res.status(201).json(data)
+})
+
+/**
+ * Remove a song to a users listen to
+ */
+router.delete('/:id/listento', async (req, res) => {
+    const songId = req.params.id;
+    const userId = req.headers['x-user-id'] as string
+
+    if (!songId ) {
+        return res.status(400).json({ error: 'Song ID is required' })
+    }
+
+    const { data: existSong, error: noSong } = await supabase 
+        .from('songs')
+        .select('id')
+        .eq('id', songId)
+        .single()
+    if (noSong) {
+        return res.status(404).json({ error: 'Song is not found' })
+    }
+
+    const { error } = await supabase
+        .from('listento')
+        .delete()
+        .eq('song_id', songId)
+        .eq('user_id', userId)
+
+    if (error) {
+        return res.status(500).json({ error: 'Failed to remove listen to' })
+    }
+    res.json({ message: 'Successfully deleted' })
+})
+
 
 export default router
