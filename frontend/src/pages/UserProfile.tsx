@@ -401,6 +401,9 @@ export default function UserProfile() {
           onClose={() => setShowSettingsModal(false)}
           currentPrivacy={profileUser.privacy}
           onPrivacyChange={handlePrivacyChange}
+          // Add these two new props:
+          currentUsername={profileUser.username}
+          onUsernameChange={(newUsername) => setProfileUser({ ...profileUser, username: newUsername })}
         />
       )}
 

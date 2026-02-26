@@ -29,19 +29,30 @@ router.post('/google-sync', async (req, res) => {
     // Generate the UUID
     const userUuid = uuidv5(id, NAMESPACE);
 
-    const { data, error } = await supabase
+    const { data: existingUser } = await supabase
       .from('users')
-      .upsert({ 
+      .select('*')
+      .eq('id', userUuid)
+      .single();
+
+    if (existingUser) {
+      return res.json(existingUser);
+    }
+
+    const { data: newUser, error } = await supabase
+      .from('users')
+      .insert({ 
         id: userUuid, 
         email: email, 
         username: username, 
         privacy: 'public' 
-      }, { onConflict: 'id' })
+      })
       .select()
       .single();
 
     if (error) throw error;
-    res.json(data);
+    res.json(newUser);
+
   } catch (err: any) {
     console.error("Supabase Sync Error:", err.message);
     res.status(500).json({ error: err.message });
