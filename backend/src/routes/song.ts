@@ -43,10 +43,15 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/add', async (req, res) => {
 
-    const { title, bpm, genre, year_released, album_name, artist_name} = req.body
+    const { userId, title, bpm, genre, year_released, album_name, artist_name} = req.body
+
+    if (!userId)
+        return res.status(400).json({ error: 'Must be logged in to add song' })
 
     if (!title || !bpm || !genre || !year_released || !album_name || !artist_name)
         return res.status(400).json({ error: 'Missing required fields' })
+
+    console.log(userId)
 
     //check if the artist exists and if not create them
     let { data: artist } = await supabase
@@ -95,9 +100,6 @@ router.post('/add', async (req, res) => {
     
     
     //check if album_artist relationship exists, if not create it
-    //TODO: kind of weird right now, probably should have some sort of admin to check songs
-    //TODO: add a full database so most songs dont need to be manually added, sprint 2 work
-    
     const { data: albumArtist } = await supabase
         .from('album_artists')
         .select('*')
@@ -141,6 +143,7 @@ router.post('/add', async (req, res) => {
     const { data: song, error} = await supabase
         .from('songs')
         .insert({
+            user_id: userId ?? null,
             title,
             bpm,
             genre,
@@ -167,30 +170,40 @@ router.post('/add', async (req, res) => {
  */
 router.delete('/:id', async (req, res) => {
      const songId = req.params.id
+     const userId = req.headers['x-user-id'] as string
 
+    if (!userId ) {
+        return res.status(400).json({ error: 'User not logged in' })
+    }
+    
     if (!songId ) {
         return res.status(400).json({ error: 'Song ID is required' })
     }
-
-    //check if the song exists
-    const { data: existSong, error: noSong } = await supabase 
-        .from('songs')
-        .select('id')
-        .eq('id',songId )
-        .single()
-    if (noSong) {
-        return res.status(404).json({ error: 'Song is not found' })
+    try {
+        //check if the song exists and belongs to the user
+        const { data: existSong, error: noSong } = await supabase 
+            .from('songs')
+            .select('id, user_id')
+            .eq('id',songId )
+            .single()
+        if (noSong) {
+            return res.status(404).json({ error: 'Song is not found' })
+        }
+        if (existSong.user_id != userId) {
+            return res.status(404).json({ error: 'You can only delete your own songs' })
+        }
+        //delete the song
+        const { error : deleteError } = await supabase
+            .from('songs')
+            .delete()
+            .eq('id',songId )
+        if (deleteError) {
+            return res.status(500).json({ error: deleteError.message }) 
+        } 
+        res.status(201).json({ message: 'Song deleted successfully'})
+    } catch (err: any) {
+        return res.status(500).json({ error: err.message }) 
     }
-    //delete the song
-    const { error : deleteError } = await supabase
-        .from('songs')
-        .delete()
-        .eq('id',songId )
-    if (deleteError) {
-       return res.status(500).json({ error: deleteError.message }) 
-    }
-
-    res.status(201).json({ message: 'Song deleted successfully'})
 })
 
 /**
@@ -198,7 +211,13 @@ router.delete('/:id', async (req, res) => {
  */
 router.patch('/:id', async (req, res) => {
     const songId = req.params.id
+    const userId = req.headers['x-user-id'] as string
     const {title, bpm, genre, year_released} = req.body
+
+    if (!userId ) {
+        return res.status(400).json({ error: 'User not logged in' })
+    }
+
     if (!songId ) {
         return res.status(400).json({ error: 'Song ID is required' })
     }
@@ -209,26 +228,34 @@ router.patch('/:id', async (req, res) => {
     if (year_released != null && (typeof year_released != 'number' || year_released < 0)) {
         return res.status(400).json({ error: 'Invalid Year' })
     }
-    //check if the song exists
-    const { data: existSong, error: noSong } = await supabase 
-        .from('songs')
-        .select('id')
-        .eq('id',songId )
-        .single()
-    if (noSong) {
-        return res.status(404).json({ error: 'Song is not found' })
-    }
+    try {
+        //check if the song exists and belongs to the user
+        const { data: existSong, error: noSong } = await supabase 
+            .from('songs')
+            .select('id, user_id')
+            .eq('id',songId )
+            .single()
+        if (noSong) {
+            return res.status(404).json({ error: 'Song is not found' })
+        }
 
-    const{ data, error: errorUpdate} = await supabase
-        .from('songs')
-        .update({ title, bpm, genre, year_released })
-        .eq('id', songId)
-        .select()
-        .single()
-    if (errorUpdate) {
-        return res.status(500).json({ error: 'Failed to update song' })
+        if (existSong.user_id != userId) {
+            return res.status(403).json({ error: 'You can only edit your own songs' })
+        }
+
+        const{ data, error: errorUpdate} = await supabase
+            .from('songs')
+            .update({ title, bpm, genre, year_released })
+            .eq('id', songId)
+            .select()
+            .single()
+        if (errorUpdate) {
+            return res.status(500).json({ error: 'Failed to update song' })
+        }
+        res.json(data);
+    } catch (err: any) {
+        return res.status(500).json({ error: err.message }) 
     }
-    res.json(data);
 })
 
 router.get('/:id/listened', async (req, res) => {
