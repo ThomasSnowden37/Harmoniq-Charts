@@ -32,17 +32,59 @@ router.get('/user/:userId', async (req, res) => {
   res.json(playlists.map(p => ({ ...p, song_count: countMap.get(p.id) || 0 })))
 })
 
+// Helper to check if users are friends
+async function areFriends(userId1: string, userId2: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('friend_requests')
+    .select('id')
+    .eq('status', 'accepted')
+    .or(`and(requester_id.eq.${userId1},addressee_id.eq.${userId2}),and(requester_id.eq.${userId2},addressee_id.eq.${userId1})`)
+    .limit(1)
+  return (data?.length ?? 0) > 0
+}
+
+// Helper to check if a user can access a playlist (based on privacy)
+async function canAccessPlaylist(playlistId: string, requesterId: string | undefined): Promise<{ allowed: boolean; playlist?: any }> {
+  const { data: playlist } = await supabase
+    .from('playlists')
+    .select('user_id, users(privacy)')
+    .eq('id', playlistId)
+    .single()
+
+  if (!playlist) return { allowed: false }
+
+  const ownerPrivacy = (playlist.users as any)?.privacy
+  if (ownerPrivacy !== 'private') return { allowed: true, playlist }
+
+  const isOwner = requesterId === playlist.user_id
+  if (isOwner) return { allowed: true, playlist }
+
+  const isFriend = requesterId ? await areFriends(requesterId, playlist.user_id) : false
+  return { allowed: isFriend, playlist }
+}
+
 // Get playlist by ID with songs
 router.get('/:id', async (req, res) => {
   const { id } = req.params
+  const requesterId = req.headers['x-user-id'] as string | undefined
 
   const { data: playlist, error: playlistError } = await supabase
     .from('playlists')
-    .select('*, users(username)')
+    .select('*, users(username, privacy)')
     .eq('id', id)
     .single()
 
   if (playlistError) return res.status(404).json({ error: 'Playlist not found' })
+
+  // Privacy check: if owner is private, only owner or friends can view
+  const ownerPrivacy = (playlist.users as any)?.privacy
+  if (ownerPrivacy === 'private') {
+    const isOwner = requesterId === playlist.user_id
+    const isFriend = requesterId ? await areFriends(requesterId, playlist.user_id) : false
+    if (!isOwner && !isFriend) {
+      return res.status(403).json({ error: 'This playlist belongs to a private account' })
+    }
+  }
 
   const { data: songs, error: songsError } = await supabase
     .from('playlist_songs')
@@ -235,6 +277,10 @@ router.delete('/:id/songs/:songId', async (req, res) => {
 // Get likes for a playlist
 router.get('/:id/likes', async (req, res) => {
   const { id } = req.params
+  const requesterId = req.headers['x-user-id'] as string | undefined
+
+  const { allowed } = await canAccessPlaylist(id, requesterId)
+  if (!allowed) return res.status(403).json({ error: 'This playlist belongs to a private account' })
 
   const { data: likes, error } = await supabase
     .from('playlist_likes')
@@ -251,6 +297,9 @@ router.get('/:id/likes/check', async (req, res) => {
   const { id } = req.params
   const userId = req.headers['x-user-id'] as string
   if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  const { allowed } = await canAccessPlaylist(id, userId)
+  if (!allowed) return res.status(403).json({ error: 'This playlist belongs to a private account' })
 
   const { data, error } = await supabase
     .from('playlist_likes')
@@ -270,6 +319,9 @@ router.post('/:id/likes', async (req, res) => {
   const { id } = req.params
   const userId = req.headers['x-user-id'] as string
   if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  const { allowed } = await canAccessPlaylist(id, userId)
+  if (!allowed) return res.status(403).json({ error: 'This playlist belongs to a private account' })
 
   const { data, error } = await supabase
     .from('playlist_likes')
@@ -292,6 +344,9 @@ router.delete('/:id/likes', async (req, res) => {
   const userId = req.headers['x-user-id'] as string
   if (!userId) return res.status(401).json({ error: 'Unauthorized' })
 
+  const { allowed } = await canAccessPlaylist(id, userId)
+  if (!allowed) return res.status(403).json({ error: 'This playlist belongs to a private account' })
+
   const { error } = await supabase
     .from('playlist_likes')
     .delete()
@@ -307,6 +362,10 @@ router.delete('/:id/likes', async (req, res) => {
 // Get comments for a playlist
 router.get('/:id/comments', async (req, res) => {
   const { id } = req.params
+  const requesterId = req.headers['x-user-id'] as string | undefined
+
+  const { allowed } = await canAccessPlaylist(id, requesterId)
+  if (!allowed) return res.status(403).json({ error: 'This playlist belongs to a private account' })
 
   const { data: comments, error } = await supabase
     .from('playlist_comments')
@@ -325,6 +384,9 @@ router.post('/:id/comments', async (req, res) => {
   const userId = req.headers['x-user-id'] as string
   if (!userId) return res.status(401).json({ error: 'Unauthorized' })
 
+  const { allowed } = await canAccessPlaylist(id, userId)
+  if (!allowed) return res.status(403).json({ error: 'This playlist belongs to a private account' })
+
   if (!content || content.trim() === '') {
     return res.status(400).json({ error: 'Content is required' })
   }
@@ -341,9 +403,12 @@ router.post('/:id/comments', async (req, res) => {
 
 // Delete a comment
 router.delete('/:id/comments/:commentId', async (req, res) => {
-  const { commentId } = req.params
+  const { id, commentId } = req.params
   const userId = req.headers['x-user-id'] as string
   if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  const { allowed } = await canAccessPlaylist(id, userId)
+  if (!allowed) return res.status(403).json({ error: 'This playlist belongs to a private account' })
 
   // Verify ownership
   const { data: comment, error: fetchError } = await supabase

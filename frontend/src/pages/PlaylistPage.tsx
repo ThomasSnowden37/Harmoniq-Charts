@@ -44,7 +44,13 @@ export default function PlaylistPage() {
   async function fetchPlaylist() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/playlists/${playlistId}`)
+      const res = await fetch(`/api/playlists/${playlistId}`, {
+        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+      })
+      if (res.status === 403) {
+        const data = await res.json()
+        throw new Error(data.error || 'This playlist is private')
+      }
       if (!res.ok) throw new Error('Playlist not found')
       setPlaylist(await res.json())
     } catch (err: any) {
@@ -139,22 +145,23 @@ export default function PlaylistPage() {
 
   if (loading) {
     return (
-      <Box className="min-h-screen">
+      <Box className="min-h-screen flex flex-col">
         <Navbar />
-        <Box className="max-w-3xl mx-auto" p="6">
+        <Flex className="max-w-3xl mx-auto flex-1" p="6" justify="center" align="center">
           <Text color="gray">Loading...</Text>
-        </Box>
+        </Flex>
       </Box>
     )
   }
 
   if (error || !playlist) {
     return (
-      <Box className="min-h-screen">
+      <Box className="min-h-screen flex flex-col">
         <Navbar />
-        <Box className="max-w-3xl mx-auto" p="6">
+        <Flex className="max-w-3xl mx-auto flex-1" p="6" justify="center" align="center">
           <Text color="red">{error || 'Playlist not found'}</Text>
-        </Box>
+        </Flex>
+        <Footer />
       </Box>
     )
   }
