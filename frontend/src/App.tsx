@@ -3,6 +3,8 @@ import UserProfile from './pages/UserProfile'
 import LandingPage from './pages/LandingPage'
 import CreateSong from './pages/CreateSong'
 import SongPage from './pages/SongPage'
+import SearchPage from "./pages/SearchPage";
+
 
 
 // Define routes to various pages here
@@ -14,6 +16,7 @@ function App() {
         <Route path="/user/:userId" element={<UserProfile />} />
         <Route path="/songs/add" element={<CreateSong  />} />
         <Route path="/songs/:id" element={<SongPage  />} />
+        <Route path="/search" element={<SearchPage />} />
       </Routes>
     </BrowserRouter>
   )
