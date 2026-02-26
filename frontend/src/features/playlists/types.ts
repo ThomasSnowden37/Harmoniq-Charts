@@ -26,3 +26,20 @@ export interface PlaylistCheckItem {
   name: string
   hasSong: boolean
 }
+
+export interface PlaylistLike {
+  id: string
+  user_id: string
+  playlist_id: string
+  created_at: string
+  users?: { id: string; username: string }
+}
+
+export interface PlaylistComment {
+  id: string
+  user_id: string
+  playlist_id: string
+  content: string
+  created_at: string
+  users?: { id: string; username: string }
+}

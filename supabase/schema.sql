@@ -109,6 +109,23 @@ CREATE TABLE playlist_songs (
     UNIQUE(playlist_id, song_id) -- No duplicate songs in a playlist
 );
 
+-- PLAYLIST INTERACTIONS
+CREATE TABLE playlist_likes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    playlist_id UUID REFERENCES playlists(id) ON DELETE CASCADE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, playlist_id) -- One like per user per playlist
+);
+
+CREATE TABLE playlist_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    playlist_id UUID REFERENCES playlists(id) ON DELETE CASCADE NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- FRIEND REQUESTS
 CREATE TABLE friend_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -141,6 +158,9 @@ CREATE INDEX idx_listened_user_id ON listened(user_id);
 CREATE INDEX idx_listened_song_id ON listened(song_id);
 CREATE INDEX idx_playlists_user_id ON playlists(user_id);
 CREATE INDEX idx_playlist_songs_playlist_id ON playlist_songs(playlist_id);
+CREATE INDEX idx_playlist_likes_playlist_id ON playlist_likes(playlist_id);
+CREATE INDEX idx_playlist_likes_user_id ON playlist_likes(user_id);
+CREATE INDEX idx_playlist_comments_playlist_id ON playlist_comments(playlist_id);
 CREATE INDEX idx_songs_album_id ON songs(album_id);
 CREATE INDEX idx_recommendations_source ON recommendations(source_song_id);
 CREATE INDEX idx_friend_requests_requester ON friend_requests(requester_id);
@@ -154,6 +174,8 @@ ALTER TABLE ratings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE listened ENABLE ROW LEVEL SECURITY;
 ALTER TABLE playlists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE playlist_songs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE playlist_likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE playlist_comments ENABLE ROW LEVEL SECURITY;
 
 -- Public read access for songs, artists, albums (everyone can browse music)
 ALTER TABLE songs ENABLE ROW LEVEL SECURITY;
@@ -209,6 +231,16 @@ CREATE POLICY "Users can manage own playlist songs" ON playlist_songs FOR INSERT
     WITH CHECK (EXISTS (SELECT 1 FROM playlists WHERE id = playlist_id AND user_id = auth.uid()));
 CREATE POLICY "Users can delete own playlist songs" ON playlist_songs FOR DELETE
     USING (EXISTS (SELECT 1 FROM playlists WHERE id = playlist_id AND user_id = auth.uid()));
+
+-- Playlist likes
+CREATE POLICY "Anyone can read playlist likes" ON playlist_likes FOR SELECT USING (true);
+CREATE POLICY "Users can create own playlist likes" ON playlist_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own playlist likes" ON playlist_likes FOR DELETE USING (auth.uid() = user_id);
+
+-- Playlist comments
+CREATE POLICY "Anyone can read playlist comments" ON playlist_comments FOR SELECT USING (true);
+CREATE POLICY "Users can create own playlist comments" ON playlist_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own playlist comments" ON playlist_comments FOR DELETE USING (auth.uid() = user_id);
 
 -- Recommendations
 CREATE POLICY "Anyone can read recommendations" ON recommendations FOR SELECT USING (true);

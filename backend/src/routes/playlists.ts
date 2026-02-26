@@ -230,4 +230,138 @@ router.delete('/:id/songs/:songId', async (req, res) => {
   res.json({ message: 'Song removed from playlist' })
 })
 
+// ============ PLAYLIST LIKES ============
+
+// Get likes for a playlist
+router.get('/:id/likes', async (req, res) => {
+  const { id } = req.params
+
+  const { data: likes, error } = await supabase
+    .from('playlist_likes')
+    .select('*, users(id, username)')
+    .eq('playlist_id', id)
+    .order('created_at', { ascending: false })
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(likes)
+})
+
+// Check if current user liked a playlist
+router.get('/:id/likes/check', async (req, res) => {
+  const { id } = req.params
+  const userId = req.headers['x-user-id'] as string
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  const { data, error } = await supabase
+    .from('playlist_likes')
+    .select('id')
+    .eq('playlist_id', id)
+    .eq('user_id', userId)
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    return res.status(500).json({ error: error.message })
+  }
+  res.json({ liked: !!data })
+})
+
+// Like a playlist
+router.post('/:id/likes', async (req, res) => {
+  const { id } = req.params
+  const userId = req.headers['x-user-id'] as string
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  const { data, error } = await supabase
+    .from('playlist_likes')
+    .insert({ playlist_id: id, user_id: userId })
+    .select()
+    .single()
+
+  if (error) {
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'Already liked' })
+    }
+    return res.status(500).json({ error: error.message })
+  }
+  res.status(201).json(data)
+})
+
+// Unlike a playlist
+router.delete('/:id/likes', async (req, res) => {
+  const { id } = req.params
+  const userId = req.headers['x-user-id'] as string
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  const { error } = await supabase
+    .from('playlist_likes')
+    .delete()
+    .eq('playlist_id', id)
+    .eq('user_id', userId)
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ message: 'Like removed' })
+})
+
+// ============ PLAYLIST COMMENTS ============
+
+// Get comments for a playlist
+router.get('/:id/comments', async (req, res) => {
+  const { id } = req.params
+
+  const { data: comments, error } = await supabase
+    .from('playlist_comments')
+    .select('*, users(id, username)')
+    .eq('playlist_id', id)
+    .order('created_at', { ascending: false })
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(comments)
+})
+
+// Add a comment to a playlist
+router.post('/:id/comments', async (req, res) => {
+  const { id } = req.params
+  const { content } = req.body
+  const userId = req.headers['x-user-id'] as string
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  if (!content || content.trim() === '') {
+    return res.status(400).json({ error: 'Content is required' })
+  }
+
+  const { data, error } = await supabase
+    .from('playlist_comments')
+    .insert({ playlist_id: id, user_id: userId, content: content.trim() })
+    .select('*, users(id, username)')
+    .single()
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.status(201).json(data)
+})
+
+// Delete a comment
+router.delete('/:id/comments/:commentId', async (req, res) => {
+  const { commentId } = req.params
+  const userId = req.headers['x-user-id'] as string
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  // Verify ownership
+  const { data: comment, error: fetchError } = await supabase
+    .from('playlist_comments')
+    .select('user_id')
+    .eq('id', commentId)
+    .single()
+
+  if (fetchError) return res.status(404).json({ error: 'Comment not found' })
+  if (comment.user_id !== userId) return res.status(403).json({ error: 'Forbidden' })
+
+  const { error } = await supabase
+    .from('playlist_comments')
+    .delete()
+    .eq('id', commentId)
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ message: 'Comment deleted' })
+})
+
 export default router
