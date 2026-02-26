@@ -4,6 +4,7 @@ import { MOCK_CURRENT_USER_ID } from '../lib/auth'
 import FriendsModal from '../features/friends/components/FriendsModal'
 import SettingsModal from '../features/settings/components/SettingsModal'
 import PlaylistSection from '../features/playlists/components/PlaylistSection'
+import DeleteUserModal from '../features/users/components/DeleteUserModal'
 import type { PrivacySetting } from '../features/settings/types'
 import type { Playlist } from '../features/playlists/types'
 import {
@@ -59,6 +60,7 @@ export default function UserProfile() {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [friendCount, setFriendCount] = useState(0)
+  const [deleteUserModal, setDeleteUserModal] = useState(false)
 
   const isOwnProfile = userId === MOCK_CURRENT_USER_ID
 
@@ -220,6 +222,9 @@ export default function UserProfile() {
           </Button>
           <Button variant="outline" onClick={() => setShowSettingsModal(true)}>
             Settings
+          </Button>
+          <Button variant="outline" color="red" onClick={() => setDeleteUserModal(true)}>
+            Delete Account
           </Button>
         </Flex>
       )
@@ -395,6 +400,14 @@ export default function UserProfile() {
           onPrivacyChange={handlePrivacyChange}
         />
       )}
+
+      <DeleteUserModal
+          isOpen={deleteUserModal}
+          onClose={() => setDeleteUserModal(false)}
+          onDeleted={() => {
+            window.location.href = '/'
+          }}
+        />
       <Box mt="8">
         <Footer />
       </Box>

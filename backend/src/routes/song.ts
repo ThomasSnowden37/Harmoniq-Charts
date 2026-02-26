@@ -26,7 +26,6 @@ const router = Router()
  * Get all listened to for user
  */
 router.get('/listentolist', async (req, res) => {
-    console.log("here67")
     const userId = req.headers['x-user-id'] as string
     if (!userId ) {
         return res.status(400).json({ error: 'User is required to be logged in' })
@@ -424,7 +423,6 @@ router.get('/:id/listened/count', async (req, res) => {
         .eq('id', songId)
         .single()
     if (noSong) {
-        console.log("here68")
         return res.status(404).json({ error: 'Song is not found' })
     }
     const {count, error} = await supabase

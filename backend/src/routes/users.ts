@@ -75,4 +75,26 @@ router.patch('/:id', async (req, res) => {
   res.json(data)
 })
 
+/**
+ * Delete a user
+ */
+router.delete('/:id', async (req, res) => {
+    const userId = getUserId(req)
+    if (!userId) return res.status(401).json({ error: 'Missing x-user-id header' })
+    if (userId !== req.params.id) return res.status(403).json({ error: 'You can only delete your own profile' })
+    try {
+        //delete the song
+        const { error : deleteError } = await supabase
+            .from('users')
+            .delete()
+            .eq('id',userId )
+        if (deleteError) {
+            return res.status(500).json({ error: deleteError.message }) 
+        } 
+        res.status(201).json({ message: 'User deleted successfully'})
+    } catch (err: any) {
+        return res.status(500).json({ error: err.message }) 
+    }
+})
+
 export default router

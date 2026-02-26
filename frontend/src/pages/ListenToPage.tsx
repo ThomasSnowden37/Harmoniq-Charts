@@ -64,7 +64,7 @@ export default function ListenToLaterPage() {
                         onClick={() => navigate(`/songs/${song.id}`)}
                     >
                     <div className="flex flex-wrap gap-4 w-full">
-                    <div className="flex-1 min-w-[200px]">Songwriter(s): {song.title}</div>
+                    <div className="flex-1 min-w-[200px]">Song Title: {song.title}</div>
                     <div className="flex-1 min-w-[120px]">Genre: {song.genre}</div>
                     <div className="flex-1 min-w-[120px]">BPM: {song.bpm}</div>
                     <div className="flex-1 min-w-[120px]">Year: {song.year_released}</div>

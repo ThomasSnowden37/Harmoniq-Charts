@@ -5,7 +5,7 @@ import CreateSong from './pages/CreateSong'
 import SongPage from './pages/SongPage'
 import SearchPage from "./pages/SearchPage";
 import PlaylistPage from './pages/PlaylistPage'
-import ListenToPage  from './pages/listentoPage'
+import ListenToPage  from './pages/ListenToPage'
 
 // Define routes to various pages here
 function App() {
