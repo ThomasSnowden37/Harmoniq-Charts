@@ -3,6 +3,7 @@ import { MOCK_CURRENT_USER_ID } from '../lib/auth' //need to get acutal auths
 import { useParams } from 'react-router-dom'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
+import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
 
 
 //Super basic placeholder
@@ -34,6 +35,7 @@ export default function SongPage() {
     const [error, setError] = useState<string | null>(null)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
+    const [playlistOpen, setPlaylistOpen] = useState(false)
     const [listenedCount, setListenedCount] = useState(0)
 
 
@@ -87,6 +89,13 @@ export default function SongPage() {
       >
         Edit Song
       </button>
+      {/* Add to Playlist button */}
+      <button
+        onClick={() => setPlaylistOpen(true)}
+        className="mt-6 px-4 py-2 bg-green-600 rounded-lg hover:bg-green-500"
+      >
+        Add to Playlist
+      </button>
       <DeleteSongModal
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}
@@ -99,6 +108,11 @@ export default function SongPage() {
         onClose={() => setEditOpen(false)}
         song={song}
         onUpdated={(updated) => setSong(updated)}
+      />
+      <AddToPlaylistModal
+        isOpen={playlistOpen}
+        onClose={() => setPlaylistOpen(false)}
+        songId={song.id}
       />
     </div>
   )

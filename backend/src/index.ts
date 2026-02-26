@@ -7,6 +7,7 @@ import friendRequestsRouter from './routes/friendRequests.js'
 import usersRouter from './routes/users.js'
 import songRouter from './routes/song.js'
 import authRouter from './routes/auth.js'
+import playlistRouter from './routes/playlists.js'
 
 dotenv.config()
 
@@ -20,7 +21,8 @@ app.use(express.json())
 app.use('/api/friend-requests', friendRequestsRouter)
 app.use('/api/users', usersRouter)
 app.use('/api/songs', songRouter)
-app.use('/api/auth', authRouter);
+app.use('/api/auth', authRouter)
+app.use('/api/playlists', playlistRouter)
 
 // Test the supabase connection with this endpoint
 app.get('/api/test-db', async (req, res) => {

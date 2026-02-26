@@ -3,7 +3,9 @@ import { useParams } from 'react-router-dom'
 import { MOCK_CURRENT_USER_ID } from '../lib/auth'
 import FriendsModal from '../features/friends/components/FriendsModal'
 import SettingsModal from '../features/settings/components/SettingsModal'
+import PlaylistSection from '../features/playlists/components/PlaylistSection'
 import type { PrivacySetting } from '../features/settings/types'
+import type { Playlist } from '../features/playlists/types'
 import {
   Avatar,
   Badge,
@@ -55,6 +57,7 @@ export default function UserProfile() {
   const [error, setError] = useState<string | null>(null)
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [playlists, setPlaylists] = useState<Playlist[]>([])
 
   const isOwnProfile = userId === MOCK_CURRENT_USER_ID
 
@@ -62,12 +65,13 @@ export default function UserProfile() {
   const stats = {
     reviews: 0,
     friends: 0,
-    playlists: 0,
+    playlists: playlists.length,
   }
 
   useEffect(() => {
     if (!userId) return
     fetchProfile()
+    fetchPlaylists()
     if (!isOwnProfile) {
       fetchRelationship()
     }
@@ -87,6 +91,15 @@ export default function UserProfile() {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchPlaylists() {
+    try {
+      const res = await fetch(`/api/playlists/user/${userId}`)
+      if (res.ok) setPlaylists(await res.json())
+    } catch (err) {
+      console.error('Failed to fetch playlists:', err)
     }
   }
 
@@ -342,23 +355,11 @@ export default function UserProfile() {
             </Tabs.Content>
 
             <Tabs.Content value="playlists">
-              <Card size="3" mt="3">
-                <Heading size="4" mb="4">Playlists</Heading>
-                {stats.playlists === 0 ? (
-                  <Flex direction="column" align="center" py="6">
-                    <Text color="gray">No playlists yet.</Text>
-                    {isOwnProfile && (
-                      <Text size="2" color="gray" mt="1">
-                        Create a playlist to share your favorite tracks!
-                      </Text>
-                    )}
-                  </Flex>
-                ) : (
-                  <Flex direction="column" gap="4">
-                    {/* TODO: Map over real playlists here */}
-                  </Flex>
-                )}
-              </Card>
+              <PlaylistSection
+                playlists={playlists}
+                setPlaylists={setPlaylists}
+                isOwnProfile={isOwnProfile}
+              />
             </Tabs.Content>
           </Tabs.Root>
         )}
