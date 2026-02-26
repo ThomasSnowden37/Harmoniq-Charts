@@ -32,10 +32,24 @@ router.post('/', async (req, res) => {
     .from('friend_requests')
     .select('*')
     .or(`and(requester_id.eq.${requesterId},addressee_id.eq.${addressee_id}),and(requester_id.eq.${addressee_id},addressee_id.eq.${requesterId})`)
-    .in('status', ['pending', 'accepted'])
+    .in('status', ['pending', 'accepted', 'rejected'])
+    .maybeSingle()
 
-  if (existing && existing.length > 0) {
-    return res.status(409).json({ error: 'A friend request already exists between these users' })
+  if (existing) {
+    if (existing.status === 'pending' || existing.status === 'accepted') {
+      return res.status(409).json({ error: 'A friend request already exists between these users' })
+    }
+
+    // Rejected — reset it to pending so the user can retry
+    const { data, error } = await supabase
+      .from('friend_requests')
+      .update({ status: 'pending', requester_id: requesterId, addressee_id })
+      .eq('id', existing.id)
+      .select()
+      .single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(201).json(data)
   }
 
   const { data, error } = await supabase

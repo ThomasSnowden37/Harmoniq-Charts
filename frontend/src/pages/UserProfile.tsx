@@ -58,13 +58,14 @@ export default function UserProfile() {
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [playlists, setPlaylists] = useState<Playlist[]>([])
+  const [friendCount, setFriendCount] = useState(0)
 
   const isOwnProfile = userId === MOCK_CURRENT_USER_ID
 
   // TODO: Replace with real data from API
   const stats = {
     reviews: 0,
-    friends: 0,
+    friends: friendCount,
     playlists: playlists.length,
   }
 
@@ -72,6 +73,7 @@ export default function UserProfile() {
     if (!userId) return
     fetchProfile()
     fetchPlaylists()
+    fetchFriendCount()
     if (!isOwnProfile) {
       fetchRelationship()
     }
@@ -91,6 +93,20 @@ export default function UserProfile() {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchFriendCount() {
+    try {
+      const res = await fetch('/api/friend-requests/friends', {
+        headers: { 'x-user-id': userId! },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setFriendCount(data.length)
+      }
+    } catch (err) {
+      console.error('Failed to fetch friend count:', err)
     }
   }
 
@@ -187,6 +203,7 @@ export default function UserProfile() {
       })
       if (!res.ok) throw new Error('Failed to unfriend')
       setRelationship({ status: 'none' })
+      setFriendCount(c => Math.max(0, c - 1))
     } catch (err: any) {
       setError(err.message)
     } finally {
