@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MOCK_CURRENT_USER_ID } from '../lib/auth' //need to get acutal auths
+import { supabase } from '../lib/supabase';
 import { Form } from "radix-ui";
 import {
   Avatar,
@@ -15,6 +15,7 @@ import {
 } from '@radix-ui/themes'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { useAuth } from '../context/AuthContext';
 
 /**
  * TODO:
@@ -33,15 +34,22 @@ import Footer from '../components/Footer'
  */
 
 export default function CreateSong() {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-
 
  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setMessage(null)
     
+    if (!user) {
+        setMessage("You must be logged in to add a song\n")
+        setLoading(false)
+        return;
+    }
+    const userId = user.id;
+
     const forms = e.currentTarget
     const form = new FormData(e.currentTarget)
     const title = form.get('title')?.toString() ?? ''
@@ -53,9 +61,9 @@ export default function CreateSong() {
     try {
         const res = await fetch('http://localhost:3001/api/songs/add', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-user-id': MOCK_CURRENT_USER_ID,},
+          headers: { 'Content-Type': 'application/json', 'x-user-id': userId,},
           body: JSON.stringify({
-          userId: MOCK_CURRENT_USER_ID,
+          userId: userId,
           title,
           bpm,
           genre,

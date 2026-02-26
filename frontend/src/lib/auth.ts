@@ -1,2 +1,5 @@
-// TODO: Replace with real auth
-export const MOCK_CURRENT_USER_ID = '11111111-1111-1111-1111-111111111111'
+export let MOCK_CURRENT_USER_ID = '11111111-1111-1111-1111-111111111111';
+
+export const setRealUserId = (id: string) => {
+  MOCK_CURRENT_USER_ID = id;
+};

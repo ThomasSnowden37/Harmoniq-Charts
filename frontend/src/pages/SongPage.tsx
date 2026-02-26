@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { MOCK_CURRENT_USER_ID } from '../lib/auth' //need to get acutal auths
 import { useParams } from 'react-router-dom'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
+import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
+import { useAuth } from '../context/AuthContext';
 
 
 //Super basic placeholder
@@ -25,15 +26,18 @@ interface Song {
     bpm: number
     genre: string
     year_released: number
+    user_id: string
 }
 
 export default function SongPage() {
+    const { user } = useAuth()
     const { id } = useParams()
     const [loading, setLoading] = useState(true)
     const [song, setSong] = useState<Song | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
+    const [playlistOpen, setPlaylistOpen] = useState(false)
     const [listenedCount, setListenedCount] = useState(0)
 
 
@@ -73,19 +77,30 @@ export default function SongPage() {
       {/*  Total listeners */}
       <p> Listeners: {listenedCount}</p>
 
-      {/* Delete button */}
+      {/* Delete button only if user created song*/}
+      {user && user.id == song.user_id && (
+        <>
       <button
         onClick={() => setDeleteOpen(true)}
         className="mt-6 px-4 py-2 bg-red-600 rounded-lg hover:bg-red-500"
       >
         Delete Song
       </button>
-      {/* Edit button */}
+      {/* Edit button only if user created song*/}
       <button
         onClick={() => setEditOpen(true)}
         className="mt-6 px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-500"
       >
         Edit Song
+      </button>
+        </>
+      )}
+      {/* Add to Playlist button */}
+      <button
+        onClick={() => setPlaylistOpen(true)}
+        className="mt-6 px-4 py-2 bg-green-600 rounded-lg hover:bg-green-500"
+      >
+        Add to Playlist
       </button>
       <DeleteSongModal
         isOpen={deleteOpen}
@@ -99,6 +114,11 @@ export default function SongPage() {
         onClose={() => setEditOpen(false)}
         song={song}
         onUpdated={(updated) => setSong(updated)}
+      />
+      <AddToPlaylistModal
+        isOpen={playlistOpen}
+        onClose={() => setPlaylistOpen(false)}
+        songId={song.id}
       />
     </div>
   )

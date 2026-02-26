@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useAuth } from '../../../context/AuthContext'
 
 interface DeleteSongModalProps {
   isOpen: boolean
@@ -16,24 +17,36 @@ export default function DeleteSongModal({
   songTitle,
   onDeleted,
 }: DeleteSongModalProps) {
+    const { user } = useAuth()        
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [success, setSuccess] = useState<string | null>(null)
 
 async function handleDelete() {
-    console.log("delete")
+    if (!user) {
+      setError("You must be logged in to delete a song")
+      return
+    }
     setLoading(true)
+    setSuccess(null)
     setError(null)
     try {
         const res = await fetch(
             `http://localhost:3001/api/songs/${songId}`,
-            { method: 'DELETE' }
-        )
+            { method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-user-id': user.id 
+              },
+            })
         const data = await res.json()
         if (!res.ok) {
             throw new Error(data.error || 'Failed to delete song')
         }
-        onDeleted?.()
-        onClose()   
+        setSuccess('Song deleted successfully')
+        //onDeleted?.()
+        } catch (err: any) {
+          setError(err.message)  
         } finally {
             setLoading(false)
         }
@@ -57,20 +70,36 @@ return createPortal(
             &times;
           </button>
         </div>
-        
         <div className='px-6 py-6'>
+          {success && (
+            <div className='bg-green-900/50 border border-green-700 rounded-lg p-3 mb-4'>
+              <p className='text-green-300 text-sm'>{success}</p>
+            </div>
+          )}
           {error && (
             <div className='bg-red-900/50 border border-red-700 rounded-lg p-3 mb-4'>
               <p className='text-red-300 text-sm'>{error}</p>
             </div>
           )}
-
+          {!success && (
           <p className='text-gray-300 mb-6'>
             Are you sure you want to delete{' '}
             <span className='text-white font-semibold'>{songTitle}</span>?
             This action cannot be undone.
             </p>
+          )}
           <div className='flex justify-end gap-3'>
+            { success ? (
+               <button onClick={() => {
+                        onDeleted?.()
+                        onClose()
+              }}
+               className='px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600'
+              >
+                Close
+              </button>
+            ) : (
+            <>
             <button onClick={onClose}
             className='px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600'
             disabled={loading}>
@@ -80,8 +109,10 @@ return createPortal(
             <button onClick={handleDelete}
             disabled={loading}
             className='px-4 py-2 rounded-lg bg-red-700 text-white hover:bg-red-600'>
-                {loading ? 'Delete': 'Delete'}
+                {loading ? 'Deleting': 'Delete'}
             </button>
+            </>
+            )}
           </div>
         </div>
       </div>

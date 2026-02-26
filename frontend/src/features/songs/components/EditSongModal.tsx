@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import * as Form from '@radix-ui/react-form'
+import { useAuth } from '../../../context/AuthContext'
 import {
   Dialog,
   Button,
@@ -10,10 +11,8 @@ import {
   Text,
 } from '@radix-ui/themes'   
 
-//TODO: Add success messages/popup
 //TODO: Check it does not make duplicate song
 //TODO: add comments and clean up
-//TODO: need auth so only user created can edit
 
 interface Song {
     id: string
@@ -21,6 +20,7 @@ interface Song {
     bpm: number
     genre: string
     year_released: number
+    user_id: string
 }
 
 interface EditSongModalProps {
@@ -31,11 +31,22 @@ interface EditSongModalProps {
 }
 
 export default function EditSongModal({ isOpen, onClose, song, onUpdated }: EditSongModalProps) {
+    const { user } = useAuth()
     const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [success, setSuccess] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isOpen) setLoading(false)
+    if (!isOpen) {
+      setLoading(false)
+      setError(null)
+    }
   }, [song, isOpen])
+
+    if (!user) {
+      setError("You must be logged in to delete a song")
+      return
+    }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -49,15 +60,27 @@ export default function EditSongModal({ isOpen, onClose, song, onUpdated }: Edit
     try {
       const res = await fetch(`http://localhost:3001/api/songs/${song.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+                'Content-Type': 'application/json',
+                'x-user-id': user.id 
+              }, 
         body: JSON.stringify({ title, bpm, genre, year_released }),
       })
       const update = await res.json()
       if (!res.ok) throw new Error(update.error || 'Failed to update song')
+
+      
+      setSuccess("Song successfully updated")
       onUpdated?.(update)
-      onClose()
+      setTimeout(() => {
+        setSuccess(null)
+        onClose()
+      },1500)
+      //onClose()
     } catch (err: any) {
-      alert(err.message)
+      err(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -85,6 +108,14 @@ export default function EditSongModal({ isOpen, onClose, song, onUpdated }: Edit
             &times;
           </Button>
         </Flex>
+        {success && (
+        <div className="bg-green-900/50 border border-green-700 rounded-lg p-3 mb-4">
+        <p className="text-green-300 text-sm">{success}</p>
+        </div>)}
+        {error && (
+          <div className="bg-red-900/50 border border-red-700 rounded-lg p-3 mb-4">
+          <p className="text-red-300 text-sm">{error}</p>
+          </div>)}
         {/* Form */}
         <Form.Root asChild>
           <form onSubmit={handleSubmit}>

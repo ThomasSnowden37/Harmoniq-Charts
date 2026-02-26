@@ -29,7 +29,8 @@ CREATE TABLE songs (
     genre VARCHAR(100),
     year_released INTEGER,
     album_id UUID REFERENCES albums(id) ON DELETE SET NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE SET NULL,
 );
 
 -- MANY TO MANY TABLES

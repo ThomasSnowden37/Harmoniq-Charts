@@ -5,6 +5,7 @@ import CreateSong from './pages/CreateSong'
 import SongPage from './pages/SongPage'
 import SearchPage from "./pages/SearchPage";
 
+import PlaylistPage from './pages/PlaylistPage'
 
 
 // Define routes to various pages here
@@ -17,6 +18,7 @@ function App() {
         <Route path="/songs/add" element={<CreateSong  />} />
         <Route path="/songs/:id" element={<SongPage  />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/playlists/:playlistId" element={<PlaylistPage />} />
       </Routes>
     </BrowserRouter>
   )
