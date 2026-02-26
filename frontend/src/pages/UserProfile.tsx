@@ -223,6 +223,9 @@ export default function UserProfile() {
           <Button variant="outline" onClick={() => setShowSettingsModal(true)}>
             Settings
           </Button>
+          <Button variant="outline" onClick={() => window.location.href = '/songs/listento'}>
+            Listen To
+          </Button>
           <Button variant="outline" color="red" onClick={() => setDeleteUserModal(true)}>
             Delete Account
           </Button>
