@@ -15,6 +15,10 @@ export default function RenamePlaylistModal({ isOpen, onClose, playlistId, curre
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const MAX_NAME_LENGTH = 50
+  const trimmedName = name.trim()
+  const isOverLimit = trimmedName.length > MAX_NAME_LENGTH
+
   useEffect(() => {
     if (isOpen) setName(currentName)
   }, [isOpen, currentName])
@@ -28,7 +32,8 @@ export default function RenamePlaylistModal({ isOpen, onClose, playlistId, curre
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim() || name.trim() === currentName) {
+    if (isOverLimit) return
+    if (!trimmedName || trimmedName === currentName) {
       onClose()
       return
     }
@@ -77,14 +82,22 @@ export default function RenamePlaylistModal({ isOpen, onClose, playlistId, curre
         )}
 
         <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="Playlist name"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            autoFocus
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 mb-4 focus:outline-none focus:border-blue-500"
-          />
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Playlist name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              autoFocus
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            />
+            <div className={`text-right text-xs mt-1 ${isOverLimit ? 'text-red-400' : 'text-gray-500'}`}>
+              {trimmedName.length}/{MAX_NAME_LENGTH}
+            </div>
+            {isOverLimit && (
+              <p className="text-red-400 text-sm mt-1">Name must be {MAX_NAME_LENGTH} characters or less</p>
+            )}
+          </div>
 
           <div className="flex gap-3">
             <button
@@ -96,7 +109,7 @@ export default function RenamePlaylistModal({ isOpen, onClose, playlistId, curre
             </button>
             <button
               type="submit"
-              disabled={loading || !name.trim()}
+              disabled={loading || !trimmedName || isOverLimit}
               className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
             >
               {loading ? 'Saving...' : 'Save'}

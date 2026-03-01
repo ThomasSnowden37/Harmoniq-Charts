@@ -33,6 +33,10 @@ export default function PlaylistPage() {
   const [newComment, setNewComment] = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
 
+  const MAX_COMMENT_LENGTH = 1000
+  const trimmedComment = newComment.trim()
+  const isCommentOverLimit = trimmedComment.length > MAX_COMMENT_LENGTH
+
   useEffect(() => {
     if (!playlistId) return
     fetchPlaylist()
@@ -111,7 +115,7 @@ export default function PlaylistPage() {
   }
 
   async function submitComment() {
-    if (!newComment.trim()) return
+    if (!trimmedComment || isCommentOverLimit) return
     setCommentLoading(true)
     try {
       const res = await fetch(`/api/playlists/${playlistId}/comments`, {
@@ -247,11 +251,17 @@ export default function PlaylistPage() {
                 onChange={e => setNewComment(e.target.value)}
                 disabled={commentLoading}
               />
-              <Flex justify="end">
-                <Button onClick={submitComment} disabled={commentLoading || !newComment.trim()}>
+              <Flex justify="between" align="center">
+                <Text size="1" color={isCommentOverLimit ? 'red' : 'gray'}>
+                  {trimmedComment.length}/{MAX_COMMENT_LENGTH}
+                </Text>
+                <Button onClick={submitComment} disabled={commentLoading || !trimmedComment || isCommentOverLimit}>
                   {commentLoading ? 'Posting...' : 'Post Comment'}
                 </Button>
               </Flex>
+              {isCommentOverLimit && (
+                <Text size="1" color="red">Comment must be {MAX_COMMENT_LENGTH} characters or less</Text>
+              )}
             </Flex>
           </Card>
 

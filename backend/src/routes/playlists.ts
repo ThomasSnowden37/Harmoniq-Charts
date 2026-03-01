@@ -137,6 +137,7 @@ router.post('/', async (req, res) => {
 
   const { name } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Name is required' })
+  if (name.trim().length > 50) return res.status(400).json({ error: 'Name must be 50 characters or less' })
 
   const { data, error } = await supabase
     .from('playlists')
@@ -157,6 +158,7 @@ router.patch('/:id', async (req, res) => {
   const { name } = req.body
 
   if (!name?.trim()) return res.status(400).json({ error: 'Name is required' })
+  if (name.trim().length > 50) return res.status(400).json({ error: 'Name must be 50 characters or less' })
 
   const { data: playlist } = await supabase
     .from('playlists')
@@ -379,6 +381,9 @@ router.post('/:id/comments', async (req, res) => {
 
   if (!content || content.trim() === '') {
     return res.status(400).json({ error: 'Content is required' })
+  }
+  if (content.trim().length > 1000) {
+    return res.status(400).json({ error: 'Comment must be 1000 characters or less' })
   }
 
   const { data, error } = await supabase
