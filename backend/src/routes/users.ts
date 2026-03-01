@@ -9,6 +9,7 @@ import { isFriend } from './friends.js'
  * Backend routes for anything relates to user information.
  *
  * Author: Tristan Sze
+ * Edited by: Thomas Snowden
  *
  */
 
@@ -48,20 +49,26 @@ router.get('/:id', async (req, res) => {
   res.json({ id: data.id, username: data.username, privacy: data.privacy, restricted: true })
 })
 
-// Update own profile (privacy setting)
+// Update own profile (privacy or username)
 router.patch('/:id', async (req, res) => {
   const userId = getUserId(req)
   if (!userId) return res.status(401).json({ error: 'Missing x-user-id header' })
   if (userId !== req.params.id) return res.status(403).json({ error: 'You can only update your own profile' })
 
-  const { privacy } = req.body
-  if (!privacy || !['public', 'private'].includes(privacy)) {
-    return res.status(400).json({ error: 'privacy must be "public" or "private"' })
+  const { privacy, username } = req.body
+  
+  // Create an object with only the fields provided in the request
+  const updates: any = {}
+  if (privacy && ['public', 'private'].includes(privacy)) updates.privacy = privacy
+  if (username && username.trim().length > 0) updates.username = username.trim()
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No valid fields provided for update' })
   }
 
   const { data, error } = await supabase
     .from('users')
-    .update({ privacy })
+    .update(updates)
     .eq('id', userId)
     .select('id, username, email, privacy, created_at')
     .single()

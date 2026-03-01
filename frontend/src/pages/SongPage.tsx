@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react'
-import { resolvePath, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
 import { useAuth } from '../context/AuthContext';
-import { REALTIME_PRESENCE_LISTEN_EVENTS } from '@supabase/supabase-js'
+import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
 
-//Super basic placeholder
-//TODO: Make page look good
-//TODO: Edit and Delete only for who created - need auths
 
 /**
  * SongPage.tsx
@@ -45,52 +43,73 @@ export default function SongPage() {
 
 
     useEffect(() => {
-        async function fetchSongAndListened() {
+       if (!id) return
+
+      async function fetchSong() {
+        setLoading(true)
         try {
-            //songs/{song uuid}
-            const res = await fetch(`http://localhost:3001/api/songs/${id}`)
-            const data = await res.json()
-            if (!res.ok) setError(`Error: ${data.error}`)
-            setSong(data)
+          const res = await fetch(`http://localhost:3001/api/songs/${id}`)
+          const data = await res.json()
 
-            if (user) {
-              const resLis = await fetch(`http://localhost:3001/api/songs/${id}/listened`, {
-                headers: { 'x-user-id': user.id }
-              })
-               const listenedData = await resLis.json()
-              if (!resLis.ok) setError(`Error: ${listenedData.error || 'Failed to fetch listened status'}`)
-              else setListened(listenedData.listened)
-            }
+          if (!res.ok) {
+            setError(data.error || 'Failed to load song')
+            return
+          }
 
-            if (user) {
-              const toLis = await fetch(`http://localhost:3001/api/songs/${id}/listento`, {
-                headers: { 'x-user-id': user.id }
-              })
-               const listentoData = await toLis.json()
-              if (!toLis.ok) setError(`Error: ${listentoData.error || 'Failed to fetch listen to status'}`)
-              else setListento(listentoData.listento)
-            }
+          setSong(data)
 
-            const countRes = await fetch(`http://localhost:3001/api/songs/${id}/listened/count`)
-            const countData = await countRes.json()
-            if (!countRes.ok) setError(`Error: ${data.error}`)
-            setListenedCount(countData.total)
-        } catch (err: any) {
-          console.error(err.message)
-        } 
-        finally {
-            setLoading(false)
+          const countRes = await fetch(
+            `http://localhost:3001/api/songs/${id}/listened/count`
+          )
+          const countData = await countRes.json()
+          if (countRes.ok) setListenedCount(countData.total)
+
+        } catch (err) {
+          setError('Failed to fetch song')
+          console.error(err)
+        } finally {
+          setLoading(false)
         }
-    }
-    if (id) fetchSongAndListened()
-  }, [id])
+      }
 
-  if (loading) return <p className="text-white p-6">Loading...</p>
-  if (error) return <p className="text-red-400 p-6">{error}</p>
-  if (!song) return <p className="text-gray-400 p-6">Song not found</p>
+      fetchSong()
+    }, [id])
+
+    useEffect(() => {
+      if (!user || !id) return
+
+      const userId = user.id
+
+      async function fetchUserSongData() {
+      try {
+        const resLis = await fetch(
+          `http://localhost:3001/api/songs/${id}/listened`,
+          { headers: { 'x-user-id': userId } }
+        )
+        const listenedData = await resLis.json()
+        if (resLis.ok) setListened(listenedData.listened)
+
+        const toLis = await fetch(
+          `http://localhost:3001/api/songs/${id}/listento`,
+          { headers: { 'x-user-id': userId } }
+        )
+        const listentoData = await toLis.json()
+        if (toLis.ok) setListento(listentoData.listento)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+  fetchUserSongData()
+}, [user, id])
+
+  if (loading) return <div className="min-h-screen flex flex-col"><Navbar /><main className="p-6 text-center">Loading...</main><Footer /></div>
+  if (error) return <div className="min-h-screen flex flex-col"><Navbar /><main className="text-red-400 p-6 text-center">{error}</main><Footer /></div>
+  if (!song) return <div className="min-h-screen flex flex-col"><Navbar /><main className="text-red-400 p-6 text-center">Song not found</main><Footer /></div>
 
   return (
-    <div className="p-6 text-black">
+    <div className="min-h-screen flex flex-col">
+    <Navbar />
+    <main className='flex-1 flex flex-col items-center justify-center p-6 text-center'>
       <h1 className="text-2xl font-bold mb-4">{song.title}</h1>
 
       <p>BPM: {song.bpm}</p>
@@ -101,7 +120,7 @@ export default function SongPage() {
       <p> Listeners: {listenedCount}</p>
 
       {/* Delete button only if user created song*/}
-      {user && user.id == song.user_id && (
+      {user && user.id == song.user_id && ( //User must be logged in and created for it to show up
         <>
       <button
         onClick={() => setDeleteOpen(true)}
@@ -118,13 +137,18 @@ export default function SongPage() {
       </button>
         </>
       )}
+
       {/* Add to Playlist button */}
+      {user && ( //User must be logged in for it to show up
       <button
         onClick={() => setPlaylistOpen(true)}
         className="mt-6 px-4 py-2 bg-green-600 rounded-lg hover:bg-green-500"
       >
         Add to Playlist
       </button>
+      )}
+      {user &&  ( //User must be logged in for it to show up
+        <>
       <DeleteSongModal
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}
@@ -143,6 +167,10 @@ export default function SongPage() {
         onClose={() => setPlaylistOpen(false)}
         songId={song.id}
       />
+      </>
+      )}
+    {user && ( //User must be logged in for it to show up
+    <>
     <button
       onClick={async () => {
       if (!user) return alert("You must be logged in to mark as listened")
@@ -191,6 +219,10 @@ export default function SongPage() {
 >
     {listento ? 'Listen To' : 'Mark as Listen To'}
   </button>
+      </>
+  )}
+  </main>
+  <Footer />
     </div>
   )
 }

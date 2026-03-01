@@ -17,6 +17,7 @@ interface AuthContextType {
   user: GoogleUser | null;
   login: (credentialResponse: CredentialResponse) => Promise<void>;
   logout: () => void;
+  updateUser: (updates: Partial<GoogleUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,8 +63,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (res.ok) {
-          setUser(googleUser);
-          setRealUserId(googleUser.id); // Updates the global ID for components
+
+          const dbUser = await res.json(); 
+
+          const finalUser: GoogleUser = {
+            ...googleUser,
+            name: dbUser.username
+          };
+
+          setUser(finalUser);
+          setRealUserId(finalUser.id); 
+
+          window.location.reload();
         }
       } catch (err) {
         console.error("Backend sync failed", err);
@@ -74,10 +85,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     setRealUserId('11111111-1111-1111-1111-111111111111');
+    
+    // Force a full page refresh to clear all component states
+    window.location.href = '/'; // This redirects to home and reloads the app
+  };
+
+  const updateUser = (updates: Partial<GoogleUser>) => {
+    setUser(prevUser => {
+      if (!prevUser) return null;
+      return { ...prevUser, ...updates };
+    });
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
