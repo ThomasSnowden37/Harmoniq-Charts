@@ -226,9 +226,6 @@ export default function UserProfile() {
           <Button variant="outline" onClick={() => window.location.href = '/songs/listento'}>
             Listen To
           </Button>
-          <Button variant="outline" color="red" onClick={() => setDeleteUserModal(true)}>
-            Delete Account
-          </Button>
         </Flex>
       )
     }
@@ -287,16 +284,15 @@ export default function UserProfile() {
   const initials = profileUser?.username?.slice(0, 2).toUpperCase() ?? '??'
 
   return (
-    <Box className="min-h-screen">
+    <Box className="min-h-screen bg-background flex flex-col">
       <Navbar />
-      <Box className="max-w-3xl mx-auto" p="4" pt="6">
+      <Box className="max-w-3xl w-full mx-auto flex-grow" p="4" pt="6">
         {/* Profile Header */}
         <Card size="3">
           <Flex align="center" gap="5">
             <Avatar
               size="7"
               fallback={initials}
-              color="indigo"
               variant="solid"
             />
             <Box className="flex-1 min-w-0">
@@ -319,8 +315,8 @@ export default function UserProfile() {
           </Flex>
 
           {error && (
-            <Box mt="4" p="3" className="rounded-lg border border-red-200 bg-red-50">
-              <Text color="red" size="2">{error}</Text>
+            <Box mt="4" p="3" className="rounded-lg border border-destructive/30 bg-destructive/10">
+              <Text className="text-destructive" size="2">{error}</Text>
             </Box>
           )}
 
@@ -404,6 +400,10 @@ export default function UserProfile() {
           // Add these two new props:
           currentUsername={profileUser.username}
           onUsernameChange={(newUsername) => setProfileUser({ ...profileUser, username: newUsername })}
+          onDeleteAccount={() => {
+            setShowSettingsModal(false)
+            setDeleteUserModal(true)
+          }}
         />
       )}
 
@@ -414,9 +414,7 @@ export default function UserProfile() {
             window.location.href = '/'
           }}
         />
-      <Box mt="8">
-        <Footer />
-      </Box>
+      <Footer />
     </Box>
   )
 }

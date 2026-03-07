@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Button } from '@radix-ui/themes'
 import type { OutgoingRequest } from '../types'
 
 interface OutgoingRequestsListProps {
@@ -15,16 +16,16 @@ export default function OutgoingRequestsList({ requests, searchQuery, onCancel, 
 
   if (requests.length === 0) {
     return (
-      <div className="bg-gray-800 rounded-lg p-8 text-center">
-        <p className="text-gray-400">No outgoing friend requests.</p>
+      <div className="bg-secondary rounded-lg p-8 text-center">
+        <p className="text-muted-foreground">No outgoing friend requests.</p>
       </div>
     )
   }
 
   if (filtered.length === 0) {
     return (
-      <div className="bg-gray-800 rounded-lg p-8 text-center">
-        <p className="text-gray-400">No outgoing requests matching '{searchQuery}'</p>
+      <div className="bg-secondary rounded-lg p-8 text-center">
+        <p className="text-muted-foreground">No outgoing requests matching '{searchQuery}'</p>
       </div>
     )
   }
@@ -34,26 +35,28 @@ export default function OutgoingRequestsList({ requests, searchQuery, onCancel, 
       {filtered.map((request) => (
         <li
           key={request.id}
-          className="bg-gray-800 rounded-lg p-4 flex items-center justify-between"
+          className="bg-secondary rounded-lg p-4 flex items-center justify-between"
         >
           <div>
             <Link
               to={`/user/${request.addressee.id}`}
-              className="text-white font-medium hover:text-blue-400"
+              className="text-foreground font-medium hover:text-primary"
             >
               {request.addressee.username}
             </Link>
-            <p className="text-gray-500 text-sm mt-1">
+            <p className="text-muted-foreground text-sm mt-1">
               Sent {new Date(request.created_at).toLocaleDateString()}
             </p>
           </div>
-          <button
+          <Button
+            size="2"
+            color="orange"
+            variant="soft"
             onClick={() => onCancel(request.id)}
             disabled={actionLoadingId === request.id}
-            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm disabled:opacity-50"
           >
             {actionLoadingId === request.id ? 'Cancelling...' : 'Cancel Request'}
-          </button>
+          </Button>
         </li>
       ))}
     </ul>

@@ -55,7 +55,7 @@ export default function PlaylistSection({ playlists, setPlaylists, isOwnProfile 
                   </Text>
                 </Link>
                 {isOwnProfile && (
-                  <DropdownMenu.Root>
+                  <DropdownMenu.Root modal={false}>
                     <DropdownMenu.Trigger>
                       <IconButton variant="ghost" size="3">
                         <svg width="18" height="18" viewBox="0 0 15 15" fill="currentColor">

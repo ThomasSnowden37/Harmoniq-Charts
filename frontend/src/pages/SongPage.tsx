@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { Button } from '@radix-ui/themes'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
@@ -103,8 +104,8 @@ export default function SongPage() {
 }, [user, id])
 
   if (loading) return <div className="min-h-screen flex flex-col"><Navbar /><main className="p-6 text-center">Loading...</main><Footer /></div>
-  if (error) return <div className="min-h-screen flex flex-col"><Navbar /><main className="text-red-400 p-6 text-center">{error}</main><Footer /></div>
-  if (!song) return <div className="min-h-screen flex flex-col"><Navbar /><main className="text-red-400 p-6 text-center">Song not found</main><Footer /></div>
+  if (error) return <div className="min-h-screen flex flex-col bg-background"><Navbar /><main className="text-destructive p-6 text-center">{error}</main><Footer /></div>
+  if (!song) return <div className="min-h-screen flex flex-col bg-background"><Navbar /><main className="text-destructive p-6 text-center">Song not found</main><Footer /></div>
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -122,30 +123,35 @@ export default function SongPage() {
       {/* Delete button only if user created song*/}
       {user && user.id == song.user_id && ( //User must be logged in and created for it to show up
         <>
-      <button
+      <Button
+        size="2"
+        color="red"
         onClick={() => setDeleteOpen(true)}
-        className="mt-6 px-4 py-2 bg-red-600 rounded-lg hover:bg-red-500"
+        className="mt-6"
       >
         Delete Song
-      </button>
+      </Button>
       {/* Edit button only if user created song*/}
-      <button
+      <Button
+        size="2"
         onClick={() => setEditOpen(true)}
-        className="mt-6 px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-500"
+        className="mt-6"
       >
         Edit Song
-      </button>
+      </Button>
         </>
       )}
 
       {/* Add to Playlist button */}
       {user && ( //User must be logged in for it to show up
-      <button
+      <Button
+        size="2"
+        color="green"
         onClick={() => setPlaylistOpen(true)}
-        className="mt-6 px-4 py-2 bg-green-600 rounded-lg hover:bg-green-500"
+        className="mt-6"
       >
         Add to Playlist
-      </button>
+      </Button>
       )}
       {user &&  ( //User must be logged in for it to show up
         <>
@@ -171,7 +177,10 @@ export default function SongPage() {
       )}
     {user && ( //User must be logged in for it to show up
     <>
-    <button
+    <Button
+      size="2"
+      variant={listened ? 'solid' : 'soft'}
+      color={listened ? 'green' : 'gray'}
       onClick={async () => {
       if (!user) return alert("You must be logged in to mark as listened")
       try {
@@ -190,12 +199,14 @@ export default function SongPage() {
       console.error(err.message)
     }
   }}
-  className={`mt-4 px-4 py-2 rounded-lg text-black font-semibold ${
-     listened ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 hover:bg-gray-500'}`}
+  className="mt-4"
 >
     {listened ? 'Listened' : 'Mark as Listened'}
-  </button>
-  <button
+  </Button>
+  <Button
+      size="2"
+      variant={listento ? 'solid' : 'soft'}
+      color={listento ? 'green' : 'gray'}
       onClick={async () => {
       if (!user) return alert("You must be logged in to mark as listen to")
       try {
@@ -214,11 +225,10 @@ export default function SongPage() {
       console.error(err.message)
     }
   }}
-  className={`mt-4 px-4 py-2 rounded-lg text-black font-semibold ${
-     listento ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 hover:bg-gray-500'}`}
+  className="mt-4"
 >
     {listento ? 'Listen To' : 'Mark as Listen To'}
-  </button>
+  </Button>
       </>
   )}
   </main>

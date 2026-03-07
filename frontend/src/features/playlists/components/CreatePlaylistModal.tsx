@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { Dialog, Button } from '@radix-ui/themes'
+import { X } from 'lucide-react'
 import { MOCK_CURRENT_USER_ID } from '../../../lib/auth'
 import type { Playlist } from '../types'
 
@@ -51,19 +52,21 @@ export default function CreatePlaylistModal({ isOpen, onClose, onCreated }: Crea
     }
   }
 
-  if (!isOpen) return null
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-sm p-6 shadow-2xl">
-        <h2 className="text-xl font-bold text-white mb-4">Create Playlist</h2>
+  return (
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Content maxWidth="400px">
+        <div className="flex items-center justify-between">
+          <Dialog.Title mb="0">Create Playlist</Dialog.Title>
+          <Dialog.Close>
+            <button className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer" aria-label="Close">
+              <X size={18} />
+            </button>
+          </Dialog.Close>
+        </div>
 
         {error && (
-          <div className="bg-red-900/50 border border-red-700 rounded-lg p-3 mb-4">
-            <p className="text-red-300 text-sm">{error}</p>
+          <div className="bg-destructive/20 border border-destructive rounded-lg p-3 mb-4">
+            <p className="text-destructive text-sm">{error}</p>
           </div>
         )}
 
@@ -75,35 +78,37 @@ export default function CreatePlaylistModal({ isOpen, onClose, onCreated }: Crea
               value={name}
               onChange={e => setName(e.target.value)}
               autoFocus
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
             />
-            <div className={`text-right text-xs mt-1 ${isOverLimit ? 'text-red-400' : 'text-gray-500'}`}>
+            <div className={`text-right text-xs mt-1 ${isOverLimit ? 'text-destructive' : 'text-muted-foreground'}`}>
               {trimmedName.length}/{MAX_NAME_LENGTH}
             </div>
             {isOverLimit && (
-              <p className="text-red-400 text-sm mt-1">Name must be {MAX_NAME_LENGTH} characters or less</p>
+              <p className="text-destructive text-sm mt-1">Name must be {MAX_NAME_LENGTH} characters or less</p>
             )}
           </div>
 
           <div className="flex gap-3">
-            <button
+            <Button
               type="button"
+              size="2"
+              variant="soft"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+              className="flex-1"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              size="2"
               disabled={loading || !trimmedName || isOverLimit}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+              className="flex-1"
             >
               {loading ? 'Creating...' : 'Create'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>,
-    document.body
+      </Dialog.Content>
+    </Dialog.Root>
   )
 }

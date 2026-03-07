@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useState } from 'react'
+import { Dialog, Button } from '@radix-ui/themes'
+import { X } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 
 interface DeleteUserModalProps {
@@ -42,7 +43,7 @@ async function handleDelete() {
     } catch {
       data = null              
     }
-        setSuccess('Song deleted successfully')
+        setSuccess('Account deleted successfully')
         setTimeout(() => {
             setSuccess(null)
             onClose()
@@ -56,71 +57,57 @@ async function handleDelete() {
             setLoading(false)
         }
 }
-if (!isOpen) return null
 
-return createPortal(
-    <div
-      className='fixed inset-0 z-50 flex items-center justify-center bg-black/60'
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-        <div className='bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md flex flex-col shadow-2xl'>
-        <div className='flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-700'>
-          <h2 className='text-xl font-bold text-white'>Delete Account</h2>
-          <button
-            onClick={onClose}
-            className='text-gray-400 hover:text-white text-2xl leading-none'
-          >
-            &times;
-          </button>
+return (
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Content maxWidth="450px">
+        <div className="flex items-center justify-between">
+          <Dialog.Title mb="0">Delete Account</Dialog.Title>
+          <Dialog.Close>
+            <button className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer" aria-label="Close">
+              <X size={18} />
+            </button>
+          </Dialog.Close>
         </div>
-        <div className='px-6 py-6'>
+        <div className='pt-4'>
           {success && (
-            <div className='bg-green-900/50 border border-green-700 rounded-lg p-3 mb-4'>
-              <p className='text-green-300 text-sm'>{success}</p>
+            <div className='bg-success/20 border border-success rounded-lg p-3 mb-4'>
+              <p className='text-success text-sm'>{success}</p>
             </div>
           )}
           {error && (
-            <div className='bg-red-900/50 border border-red-700 rounded-lg p-3 mb-4'>
-              <p className='text-red-300 text-sm'>{error}</p>
+            <div className='bg-destructive/20 border border-destructive rounded-lg p-3 mb-4'>
+              <p className='text-destructive text-sm'>{error}</p>
             </div>
           )}
           {!success && (
-          <p className='text-gray-300 mb-6'>
+          <p className='text-muted-foreground mb-6'>
             Are you sure you want to delete your account?
             This action cannot be undone.
             </p>
           )}
           <div className='flex justify-end gap-3'>
             { success ? (
-               <button onClick={() => {
+               <Button size="2" variant="soft" onClick={() => {
                         onDeleted?.()
                         onClose()
-              }}
-               className='px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600'
-              >
+              }}>
                 Close
-              </button>
+              </Button>
             ) : (
             <>
-            <button onClick={onClose}
-            className='px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600'
-            disabled={loading}>
+            <Button size="2" variant="soft" onClick={onClose} disabled={loading}>
             Cancel
-            </button>
+            </Button>
 
-            <button onClick={handleDelete}
-            disabled={loading}
-            className='px-4 py-2 rounded-lg bg-red-700 text-white hover:bg-red-600'>
+            <Button size="2" color="red" onClick={handleDelete} disabled={loading}>
                 {loading ? 'Deleting': 'Delete Account'}
-            </button>
+            </Button>
             </>
             )}
           </div>
         </div>
-      </div>
-    </div>,
-    document.body
+      </Dialog.Content>
+    </Dialog.Root>
     )
 }

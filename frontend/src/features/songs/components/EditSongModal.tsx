@@ -1,15 +1,8 @@
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
 import * as Form from '@radix-ui/react-form'
+import { Dialog, Button, Flex } from '@radix-ui/themes'
+import { X } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
-import {
-  Dialog,
-  Button,
-  Box,
-  Flex,
-  Heading,
-  Text,
-} from '@radix-ui/themes'   
 
 //TODO: Check it does not make duplicate song
 //TODO: add comments and clean up
@@ -78,141 +71,126 @@ export default function EditSongModal({ isOpen, onClose, song, onUpdated }: Edit
       },1500)
       //onClose()
     } catch (err: any) {
-      err(err.message)
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  if (!isOpen) return null
-
   return (
-    <Box
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <Box className="absolute inset-0 bg-black/60" />
-      <Box className="relative z-10 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md p-6">
-        {/* Header */}
-        <Flex justify="between" align="center" mb="4">
-          <Heading size="5" className="text-white">
-            Edit Song
-          </Heading>
-          <Button variant=
-            "ghost" 
-            size="2" 
-            onClick={onClose}
-            className="text-white text-3xl leading-none p-0">
-            &times;
-          </Button>
-        </Flex>
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Content maxWidth="450px">
+        <div className="flex items-center justify-between">
+          <Dialog.Title mb="0">Edit Song</Dialog.Title>
+          <Dialog.Close>
+            <button className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer" aria-label="Close">
+              <X size={18} />
+            </button>
+          </Dialog.Close>
+        </div>
         {success && (
-        <div className="bg-green-900/50 border border-green-700 rounded-lg p-3 mb-4">
-        <p className="text-green-300 text-sm">{success}</p>
+        <div className="bg-success/20 border border-success rounded-lg p-3 mb-4">
+        <p className="text-success text-sm">{success}</p>
         </div>)}
         {error && (
-          <div className="bg-red-900/50 border border-red-700 rounded-lg p-3 mb-4">
-          <p className="text-red-300 text-sm">{error}</p>
+          <div className="bg-destructive/20 border border-destructive rounded-lg p-3 mb-4">
+          <p className="text-destructive text-sm">{error}</p>
           </div>)}
         {/* Form */}
         <Form.Root asChild>
           <form onSubmit={handleSubmit}>
             {/* Title */}
             <Form.Field name="title" className="mb-4">
-              <Form.Label className="FormLabel text-white mb-1">Title</Form.Label>
+              <Form.Label className="FormLabel text-foreground mb-1">Title</Form.Label>
               <Form.Control asChild>
                 <input
                   name="title"
                   defaultValue={song.title}
-                  className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
-                 invalid:border-red-600 focus:invalid:border-red-600"
+                  className="Input w-full px-3 py-2 rounded text-foreground bg-background border border-border
+                 invalid:border-destructive focus:invalid:border-destructive"
                   required  
                 />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
                 Please enter a title
               </Form.Message>
             </Form.Field>
             {/* BPM */}
             <Form.Field name="bpm" className="mb-4">
-              <Form.Label className="FormLabel text-white mb-1">BPM</Form.Label>
+              <Form.Label className="FormLabel text-foreground mb-1">BPM</Form.Label>
               <Form.Control asChild>
                 <input
                   name="bpm"
                   type="number"
                   min={0}
                   defaultValue={song.bpm}
-                  className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
-                  invalid:border-red-600 focus:invalid:border-red-600"
+                  className="Input w-full px-3 py-2 rounded text-foreground bg-background border border-border
+                  invalid:border-destructive focus:invalid:border-destructive"
                   required
                 />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
                 Please enter BPM
               </Form.Message>
-              <Form.Message match="rangeUnderflow" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="rangeUnderflow" className="FormMessage text-destructive text-sm mt-1">
                 BPM must be 0 or higher
               </Form.Message>
             </Form.Field>
             {/* Genre */}
             <Form.Field name="genre" className="mb-4">
-              <Form.Label className="FormLabel text-white mb-1">Genre</Form.Label>
+              <Form.Label className="FormLabel text-foreground mb-1">Genre</Form.Label>
               <Form.Control asChild>
                 <input
                   name="genre"
                   defaultValue={song.genre}
-                  className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
-                  invalid:border-red-600 focus:invalid:border-red-600"
+                  className="Input w-full px-3 py-2 rounded text-foreground bg-background border border-border
+                  invalid:border-destructive focus:invalid:border-destructive"
                   required
                 />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
                 Please enter a genre
               </Form.Message>
             </Form.Field>
             {/* Year Released */}
             <Form.Field name="year_released" className="mb-4">
-              <Form.Label className="FormLabel text-white mb-1">Year Released</Form.Label>
+              <Form.Label className="FormLabel text-foreground mb-1">Year Released</Form.Label>
               <Form.Control asChild>
                 <input
                   name="year_released"
                   type="number"
                   min={0}
                   defaultValue={song.year_released}
-                  className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
-                  invalid:border-red-600 focus:invalid:border-red-600"
+                  className="Input w-full px-3 py-2 rounded text-foreground bg-background border border-border
+                  invalid:border-destructive focus:invalid:border-destructive"
                   required
                 />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
                 Please enter a year
               </Form.Message>
-              <Form.Message match="rangeUnderflow" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="rangeUnderflow" className="FormMessage text-destructive text-sm mt-1">
                 Year must be 0 or higher
               </Form.Message>
             </Form.Field>
             {/* Buttons */}
             <Flex justify="end" gap="2" mt="4">
               <Button 
-               variant="outline" 
-               className="text-white border-white hover:bg-white/10"
+               size="2"
+               variant="soft"
                onClick={onClose}>
                 Cancel
               </Button>
-                <Button 
+              <Button 
+                size="2"
                 type="submit"    
-                color="red"   
-                disabled={loading} 
-                className={`px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 ${
-                loading ? 'opacity-70 cursor-wait' : ''
-                }`}>
-                    {loading ? 'Saving…' : 'Save Changes'}</Button>
+                disabled={loading}>
+                    {loading ? 'Saving…' : 'Save Changes'}
+              </Button>
             </Flex>
           </form>
         </Form.Root>
-      </Box>
-    </Box>
+      </Dialog.Content>
+    </Dialog.Root>
   )
 }

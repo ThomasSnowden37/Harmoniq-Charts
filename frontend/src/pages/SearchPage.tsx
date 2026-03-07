@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, ArrowRight } from 'lucide-react';
+import { Button } from '@radix-ui/themes';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
-
 import { useNavigate } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
 
 export default function SearchPage() {
   const [query, setQuery] = useState('');
@@ -140,21 +139,21 @@ export default function SearchPage() {
   return (
     <div>
     <Navbar />
-      <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-        <div className="w-full max-w-2xl mx-4 bg-white rounded-2xl shadow-xl p-8">
-          <h1 className="text-3xl font-semibold text-center mb-2 text-blue-600">Song Lookup</h1>
-          <p className="text-center text-gray-500 mb-6">
+      <div className="min-h-screen w-full flex items-center justify-center bg-background">
+        <div className="w-full max-w-2xl mx-4 bg-card rounded-2xl shadow-xl p-8">
+          <h1 className="text-3xl font-semibold text-center mb-2 text-primary">Song Lookup</h1>
+          <p className="text-center text-muted-foreground mb-6">
             Use the dropdown menu to select what to search by
           </p>
 
           <form onSubmit={onSubmit} className="flex items-center gap-3">
             {/* Search input */}
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 aria-label="Search"
                 placeholder="Search..."
-                className="w-full pl-9 pr-4 h-12 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black/20"
+                className="w-full pl-9 pr-4 h-12 rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -164,7 +163,7 @@ export default function SearchPage() {
             <select
               value={column}
               onChange={(e) => setColumn(e.target.value as typeof column)}
-              className="h-12 px-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black/20 bg-white"
+              className="h-12 px-3 rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="title">Title</option>
               <option value="artist">Artist</option>
@@ -176,20 +175,20 @@ export default function SearchPage() {
             </select>
 
             {/* Search button */}
-            <button
+            <Button
               type="submit"
-              className="h-12 px-6 rounded-xl bg-black text-white hover:opacity-90 transition"
+              size="3"
             >
               Search
-            </button>
+            </Button>
           </form>
 
           {/* Results */}
           <div className="mt-8">
-            {loading && <p className="text-gray-500">Loading...</p>}
+            {loading && <p className="text-muted-foreground">Loading...</p>}
 
             { !firstSearch && !loading && songs.length === 0 && query && (
-              <p className="text-gray-500">No results found for "{query}" in {column}</p>
+              <p className="text-muted-foreground">No results found for "{query}" in {column}</p>
             )}
 
             {!loading && songs.length > 0 && (
@@ -197,14 +196,14 @@ export default function SearchPage() {
                 {songs.map((song: any) => (
                   <li
                     key={song.id}
-                    className="rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition flex justify-between items-center"
+                    className="rounded-xl border border-border p-4 hover:bg-secondary transition flex justify-between items-center"
                   >
                     <div>
                       <div>
-                        <div className="text-lg text-blue-600">
+                        <div className="text-lg text-primary">
                           {renderBold(song.title, "title")}
                         </div>
-                        <div className="text-gray-700">
+                        <div className="text-foreground">
                           <div className="flex flex-wrap gap-4">
                               <div className="flex-1 min-w-[150px]">
                                 Artists:{" "}
@@ -229,12 +228,13 @@ export default function SearchPage() {
                     </div>
 
                     {/* Redirect to the page */}
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="2"
                       onClick={() => navigate(`/songs/${song.id}`)}
-                      className="p-2 rounded-full hover:bg-gray-200 transition"
                     >
                       <ArrowRight className="w-5 h-5" />
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>

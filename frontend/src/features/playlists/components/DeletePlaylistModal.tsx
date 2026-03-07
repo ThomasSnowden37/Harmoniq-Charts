@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { Dialog, Button, Flex, Text } from '@radix-ui/themes'
+import { X } from 'lucide-react'
 import { MOCK_CURRENT_USER_ID } from '../../../lib/auth'
 
 interface DeletePlaylistModalProps {
@@ -38,43 +39,45 @@ export default function DeletePlaylistModal({ isOpen, onClose, playlistId, playl
     }
   }
 
-  if (!isOpen) return null
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-sm p-6 shadow-2xl">
-        <h2 className="text-xl font-bold text-white mb-2">Delete Playlist</h2>
-        <p className="text-gray-400 mb-4">
-          Are you sure you want to delete <span className="text-white font-medium">"{playlistName}"</span>? This action cannot be undone.
-        </p>
+  return (
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Content maxWidth="400px">
+        <div className="flex items-center justify-between">
+          <Dialog.Title mb="0">Delete Playlist</Dialog.Title>
+          <Dialog.Close>
+            <button className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer" aria-label="Close">
+              <X size={18} />
+            </button>
+          </Dialog.Close>
+        </div>
+        <Dialog.Description size="2" mb="4" mt="2">
+          Are you sure you want to delete <Text weight="medium">"{playlistName}"</Text>? This action cannot be undone.
+        </Dialog.Description>
 
         {error && (
-          <div className="bg-red-900/50 border border-red-700 rounded-lg p-3 mb-4">
-            <p className="text-red-300 text-sm">{error}</p>
+          <div className="bg-destructive/20 border border-destructive rounded-lg p-3 mb-4">
+            <p className="text-destructive text-sm">{error}</p>
           </div>
         )}
 
-        <div className="flex gap-3">
-          <button
-            type="button"
+        <Flex gap="3" justify="end">
+          <Button
+            size="2"
+            variant="soft"
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            size="2"
+            color="red"
             onClick={handleDelete}
             disabled={loading}
-            className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50"
           >
             {loading ? 'Deleting...' : 'Delete'}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
+          </Button>
+        </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
   )
 }

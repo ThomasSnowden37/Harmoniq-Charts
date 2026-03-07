@@ -88,7 +88,7 @@ export default function CreateSong() {
   } 
 
 return (
-  <Box className="min-h-screen bg-white flex flex-col">
+  <Box className="min-h-screen bg-background flex flex-col">
     <Navbar />
     <Box className="flex-1 flex items-center justify-center p-6">
     <Card size="3" className="w-full max-w-xl p-6">
@@ -100,115 +100,115 @@ return (
       <form onSubmit={handleSubmit} onChange={() => message && setMessage(null)}>
         {/* Title */}
         <Form.Field name="title" className="mb-4">
-            <Form.Label className="FormLabel text-black mb-1">
+            <Form.Label className="FormLabel text-foreground mb-1">
               Title</Form.Label>
             <Form.Control asChild>
               <input
                 name="title"
-                className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
-                 data-[invalid]:data-[touched]:border-red-600 
-                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
+                 data-[invalid]:data-[touched]:border-destructive 
+                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
                 required  />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
                 Please enter a title
               </Form.Message>
             </Form.Field>
 
          {/* bpm */}
         <Form.Field name="bpm" className="mb-4">
-            <Form.Label className="FormLabel text-black mb-1">
+            <Form.Label className="FormLabel text-foreground mb-1">
                 BPM</Form.Label>
               <Form.Control asChild>
                 <input
                   name="bpm"
                   type="number"
                   min={0}
-                  className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
-                 data-[invalid]:data-[touched]:border-red-600 
-                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                  className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
+                 data-[invalid]:data-[touched]:border-destructive 
+                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
                   required  
                 />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
                 Please enter the BPM
               </Form.Message>
-              <Form.Message match="rangeUnderflow" className="text-red-400 text-sm mt-1">
+              <Form.Message match="rangeUnderflow" className="text-destructive text-sm mt-1">
                 BPM must be greater than 0
             </Form.Message>
             </Form.Field>
 
             {/* Genre */} 
          <Form.Field name="genre" className="mb-4">
-            <Form.Label className="FormLabel text-black mb-1">
+            <Form.Label className="FormLabel text-foreground mb-1">
                 Genre</Form.Label>
               <Form.Control asChild>
                 <input
                   name="genre"
-                  className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
-                  data-[invalid]:data-[touched]:border-red-600 
-                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                  className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
+                  data-[invalid]:data-[touched]:border-destructive 
+                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
                   required  
                 />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
                 Please enter a Genre
               </Form.Message>
             </Form.Field>
 
          {/* Year Released  */}    
         <Form.Field name="year_released" className="mb-4">
-            <Form.Label className="FormLabel text-black mb-1">
+            <Form.Label className="FormLabel text-foreground mb-1">
                 Year Released</Form.Label>
               <Form.Control asChild>
                 <input
                   name="year_released"
                   type="number"
                   min={0}
-                  className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
-                 data-[invalid]:data-[touched]:border-red-600 
-                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                  className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
+                 data-[invalid]:data-[touched]:border-destructive 
+                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
                   required  
                 />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
                 Please enter a Year
               </Form.Message>
-              <Form.Message match="rangeUnderflow" className="text-red-400 text-sm mt-1">
+              <Form.Message match="rangeUnderflow" className="text-destructive text-sm mt-1">
                 Year must be greater than 0
             </Form.Message>
             </Form.Field>
 
          {/* Album */}    
         <Form.Field name="album" className="mb-4">
-            <Form.Label className="FormLabel text-black mb-1">
+            <Form.Label className="FormLabel text-foreground mb-1">
               Album</Form.Label>
             <Form.Control asChild>
               <input
                 name="album"
-                className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
-                 data-[invalid]:data-[touched]:border-red-600 
-                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
+                 data-[invalid]:data-[touched]:border-destructive 
+                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
                 required  />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
                 Please enter an album
               </Form.Message>
             </Form.Field>
 
          {/* Artist */}    
         <Form.Field name="artist" className="mb-4">
-            <Form.Label className="FormLabel text-black mb-1">
+            <Form.Label className="FormLabel text-foreground mb-1">
               Artist</Form.Label>
             <Form.Control asChild>
               <input
                 name="artist"
-                className="Input w-full px-3 py-2 rounded text-white bg-gray-800 border border-gray-700
-                 data-[invalid]:data-[touched]:border-red-600 
-                 focus:data-[invalid]:data-[touched]:invalid:border-red-600"
+                className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
+                 data-[invalid]:data-[touched]:border-destructive 
+                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
                 required  />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-red-400 text-sm mt-1">
+              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
                 Please enter an artist
               </Form.Message>
             </Form.Field>
@@ -218,7 +218,7 @@ return (
             <Button
                 type="submit"
                 disabled={loading}
-                className={`px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 ${
+                className={`px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 ${
                 loading ? 'opacity-70 cursor-wait' : ''
                 }`}>
                 {loading ? 'Adding…' : 'Add Song'}

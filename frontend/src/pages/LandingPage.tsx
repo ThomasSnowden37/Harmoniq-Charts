@@ -74,16 +74,16 @@ function CarouselRow({
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-pink-50 via-fuchsia-50 to-blue-100">
+      <section className="relative overflow-hidden bg-gradient-to-br from-pink-50 via-fuchsia-50 to-blue-100 dark:from-primary/10 dark:via-primary/5 dark:to-background">
         <div className="max-w-6xl mx-auto px-6 pt-16 pb-6 text-center">
-          <Heading size="9" weight="bold" className="text-gray-900 mb-4">
+          <Heading size="9" weight="bold" className="text-foreground mb-4">
             Discover. Review. Share.
           </Heading>
-          <Text size="4" className="text-gray-600 max-w-xl mx-auto block mb-2">
+          <Text size="4" className="text-muted-foreground max-w-xl mx-auto block mb-2">
             Your music, your opinions, your community. Rate albums, build
             playlists, and connect with friends.
           </Text>
@@ -97,13 +97,13 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-background">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-16">
-            <Heading size="7" weight="bold" className="text-gray-900 mb-3">
+            <Heading size="7" weight="bold" className="text-foreground mb-3">
               Everything you need to enjoy music together
             </Heading>
-            <Text size="3" className="text-gray-500 block">
+            <Text size="3" className="text-muted-foreground block">
               Harmoniq brings your music experience to life with powerful social features.
             </Text>
           </div>
@@ -118,7 +118,7 @@ export default function LandingPage() {
               <Heading size="4" weight="bold" mb="2">
                 Rate & Review
               </Heading>
-              <Text size="2" className="text-gray-500">
+              <Text size="2" className="text-muted-foreground">
                 Share your honest takes on albums and tracks. Build a review history that reflects your unique taste.
               </Text>
             </Card>
@@ -134,7 +134,7 @@ export default function LandingPage() {
               <Heading size="4" weight="bold" mb="2">
                 Build Playlists
               </Heading>
-              <Text size="2" className="text-gray-500">
+              <Text size="2" className="text-muted-foreground">
                 Curate the perfect playlist for any mood. Organize your favorite tracks and share them with friends.
               </Text>
             </Card>
@@ -151,7 +151,7 @@ export default function LandingPage() {
               <Heading size="4" weight="bold" mb="2">
                 Connect with Friends
               </Heading>
-              <Text size="2" className="text-gray-500">
+              <Text size="2" className="text-muted-foreground">
                 Find friends with similar taste, see what they're listening to, and discover music through your community.
               </Text>
             </Card>
@@ -160,50 +160,50 @@ export default function LandingPage() {
       </section>
 
       {/* How It Works */}
-      <section className="py-24 bg-gray-50">
+      <section className="py-24 bg-secondary">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-16">
-            <Heading size="7" weight="bold" className="text-gray-900 mb-3">
+            <Heading size="7" weight="bold" className="text-foreground mb-3">
               Get started in minutes
             </Heading>
-            <Text size="3" className="text-gray-500 block">
+            <Text size="3" className="text-muted-foreground block">
               Three simple steps to your new music home.
             </Text>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             <div className="text-center">
-              <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl font-bold">
+              <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xl font-bold">
                 1
               </div>
               <Heading size="4" weight="bold" mb="2">
                 Create your profile
               </Heading>
-              <Text size="2" className="text-gray-500">
+              <Text size="2" className="text-muted-foreground">
                 Set up your profile. Tell the world about your music taste.
               </Text>
             </div>
 
             <div className="text-center">
-              <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl font-bold">
+              <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xl font-bold">
                 2
               </div>
               <Heading size="4" weight="bold" mb="2">
                 Discover & review
               </Heading>
-              <Text size="2" className="text-gray-500">
+              <Text size="2" className="text-muted-foreground">
                 Browse albums, rate your favorites, and write reviews that help others find great music.
               </Text>
             </div>
 
             <div className="text-center">
-              <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl font-bold">
+              <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xl font-bold">
                 3
               </div>
               <Heading size="4" weight="bold" mb="2">
                 Connect & share
               </Heading>
-              <Text size="2" className="text-gray-500">
+              <Text size="2" className="text-muted-foreground">
                 Add friends, share playlists, and build a community around the music you love.
               </Text>
             </div>

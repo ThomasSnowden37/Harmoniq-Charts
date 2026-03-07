@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Button } from '@radix-ui/themes'
 import type { IncomingRequest } from '../types'
 
 interface IncomingRequestsListProps {
@@ -16,16 +17,16 @@ export default function IncomingRequestsList({ requests, searchQuery, onAccept, 
 
   if (requests.length === 0) {
     return (
-      <div className="bg-gray-800 rounded-lg p-8 text-center">
-        <p className="text-gray-400">No incoming friend requests.</p>
+      <div className="bg-secondary rounded-lg p-8 text-center">
+        <p className="text-muted-foreground">No incoming friend requests.</p>
       </div>
     )
   }
 
   if (filtered.length === 0) {
     return (
-      <div className="bg-gray-800 rounded-lg p-8 text-center">
-        <p className="text-gray-400">No incoming requests matching '{searchQuery}'</p>
+      <div className="bg-secondary rounded-lg p-8 text-center">
+        <p className="text-muted-foreground">No incoming requests matching '{searchQuery}'</p>
       </div>
     )
   }
@@ -35,34 +36,37 @@ export default function IncomingRequestsList({ requests, searchQuery, onAccept, 
       {filtered.map((request) => (
         <li
           key={request.id}
-          className="bg-gray-800 rounded-lg p-4 flex items-center justify-between"
+          className="bg-secondary rounded-lg p-4 flex items-center justify-between"
         >
           <div>
             <Link
               to={`/user/${request.requester.id}`}
-              className="text-white font-medium hover:text-blue-400"
+              className="text-foreground font-medium hover:text-primary"
             >
               {request.requester.username}
             </Link>
-            <p className="text-gray-500 text-sm mt-1">
+            <p className="text-muted-foreground text-sm mt-1">
               Sent {new Date(request.created_at).toLocaleDateString()}
             </p>
           </div>
           <div className="flex gap-2">
-            <button
+            <Button
+              size="2"
+              color="green"
               onClick={() => onAccept(request.id)}
               disabled={actionLoadingId === request.id}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm disabled:opacity-50"
             >
               {actionLoadingId === request.id ? 'Accepting...' : 'Accept'}
-            </button>
-            <button
+            </Button>
+            <Button
+              size="2"
+              color="red"
+              variant="soft"
               onClick={() => onReject(request.id)}
               disabled={actionLoadingId === request.id}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm disabled:opacity-50"
             >
               {actionLoadingId === request.id ? 'Rejecting...' : 'Reject'}
-            </button>
+            </Button>
           </div>
         </li>
       ))}

@@ -45,22 +45,22 @@ export default function ListenToLaterPage() {
     }, [user])
 
       return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-background">
         <Navbar />
             <main className="flex-1 flex items-center justify-center p-6">
-                <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-8">
-                <h1 className="text-3xl font-bold text-center text-blue-600 mb-4">
+                <div className="w-full max-w-2xl bg-card rounded-2xl shadow-xl p-8">
+                <h1 className="text-3xl font-bold text-center text-primary mb-4">
                 Listen To Later
                 </h1>
                 {!loading && songs.length == 0 && !error && (
-                     <p className="text-gray-500 text-center">No songs saved yet </p>
+                     <p className="text-muted-foreground text-center">No songs saved yet </p>
                 )}
                 {!loading && songs.length > 0 && (
                      <ul className="mt-4 space-y-3">
                 {songs.map((song) => (
                     <li
                         key={song.id}
-                        className="rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition flex justify-between items-center cursor-pointer"
+                        className="rounded-xl border border-border p-4 hover:bg-secondary transition flex justify-between items-center cursor-pointer"
                         onClick={() => navigate(`/songs/${song.id}`)}
                     >
                     <div className="flex flex-wrap gap-4 w-full">
