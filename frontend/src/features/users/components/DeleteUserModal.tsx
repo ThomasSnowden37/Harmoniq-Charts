@@ -37,11 +37,10 @@ async function handleDelete() {
             })
             
         const text = await res.text()
-    let data
     try {
-      data = JSON.parse(text)   
+      JSON.parse(text)   
     } catch {
-      data = null              
+      // ignore parse errors
     }
         setSuccess('Account deleted successfully')
         setTimeout(() => {

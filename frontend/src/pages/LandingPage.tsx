@@ -1,6 +1,4 @@
-import { Link } from 'react-router-dom'
-import { Button, Text, Heading, Card } from '@radix-ui/themes'
-import { MOCK_CURRENT_USER_ID } from '../lib/auth'
+import { Text, Heading, Card } from '@radix-ui/themes'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 
