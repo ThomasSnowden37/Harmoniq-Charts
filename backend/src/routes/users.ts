@@ -99,4 +99,54 @@ router.delete('/:id', async (req, res) => {
     }
 })
 
+/**
+ * Get a user's Spotify connection info (for profile display)
+ * Returns info only if: own profile, public profile, or viewer is friend
+ */
+router.get('/:id/spotify', async (req, res) => {
+  const viewerId = getUserId(req)
+  const profileId = req.params.id
+
+  // Get profile user's privacy setting
+  const { data: profileUser, error: userError } = await supabase
+    .from('users')
+    .select('privacy')
+    .eq('id', profileId)
+    .single()
+
+  if (userError) return res.status(404).json({ error: 'User not found' })
+
+  // Check if viewer can access this profile's Spotify info
+  const isOwnProfile = viewerId === profileId
+  const isPublic = profileUser.privacy === 'public'
+  let canView = isOwnProfile || isPublic
+
+  if (!canView && viewerId) {
+    // Check if viewer is friend
+    const isFriendFlag = await isFriend(viewerId, profileId)
+    canView = isFriendFlag
+  }
+
+  if (!canView) {
+    return res.status(403).json({ error: 'Not authorized to view Spotify info' })
+  }
+
+  // Get Spotify connection info
+  const { data: spotifyData, error: spotifyError } = await supabase
+    .from('user_spotify_tokens')
+    .select('spotify_display_name, spotify_profile_url')
+    .eq('user_id', profileId)
+    .single()
+
+  if (spotifyError || !spotifyData) {
+    return res.json({ connected: false })
+  }
+
+  res.json({
+    connected: true,
+    displayName: spotifyData.spotify_display_name,
+    profileUrl: spotifyData.spotify_profile_url,
+  })
+})
+
 export default router

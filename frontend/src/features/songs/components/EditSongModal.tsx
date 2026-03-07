@@ -14,6 +14,8 @@ interface Song {
     genre: string
     year_released: number
     user_id: string
+    spotify_id?: string | null
+    spotify_url?: string | null
 }
 
 interface EditSongModalProps {

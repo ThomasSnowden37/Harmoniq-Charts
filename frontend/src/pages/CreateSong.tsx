@@ -1,21 +1,19 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase';
+import { useState } from 'react'
 import { Form } from "radix-ui";
 import {
-  Avatar,
-  Badge,
   Box,
   Button,
   Card,
   Flex,
   Heading,
-  Separator,
-  Tabs,
   Text,
 } from '@radix-ui/themes'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext';
+import { useSpotify } from '../features/spotify/context/SpotifyContext'
+import { LinkSpotifyTrackModal } from '../features/spotify/components/LinkSpotifyTrackModal'
+import type { SpotifyTrack } from '../features/spotify/types'
 
 /**
  * TODO:
@@ -35,8 +33,11 @@ import { useAuth } from '../context/AuthContext';
 
 export default function CreateSong() {
   const { user } = useAuth()
+  const { isConnected: spotifyConnected } = useSpotify()
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [spotifyModalOpen, setSpotifyModalOpen] = useState(false)
+  const [linkedSpotifyTrack, setLinkedSpotifyTrack] = useState<SpotifyTrack | null>(null)
 
  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -70,6 +71,8 @@ export default function CreateSong() {
           year_released,  
           album_name,
           artist_name,
+          spotify_id: linkedSpotifyTrack?.id || null,
+          spotify_url: linkedSpotifyTrack?.external_urls?.spotify || null,
         }),
       })
       const data = await res.json()
@@ -77,6 +80,7 @@ export default function CreateSong() {
       if (!res.ok) throw new Error(data.error || 'Failed to add song')
 
       forms.reset()
+      setLinkedSpotifyTrack(null)
       setMessage('Song Successfully Added')
 
     } catch (err: any) {
@@ -212,6 +216,52 @@ return (
                 Please enter an artist
               </Form.Message>
             </Form.Field>
+
+          {/* Spotify Link Section */}
+          {spotifyConnected && (
+            <Box className="mb-4 p-3 border border-border rounded-lg bg-card/50">
+              <Text as="label" size="2" weight="medium" className="text-foreground mb-2 block">
+                Link to Spotify (Optional)
+              </Text>
+              {linkedSpotifyTrack ? (
+                <Flex justify="between" align="center" gap="2">
+                  <Flex gap="2" align="center">
+                    {linkedSpotifyTrack.album?.images?.[2]?.url && (
+                      <img 
+                        src={linkedSpotifyTrack.album.images[2].url} 
+                        alt="" 
+                        className="w-10 h-10 rounded"
+                      />
+                    )}
+                    <Box>
+                      <Text size="2" weight="medium">{linkedSpotifyTrack.name}</Text>
+                      <Text size="1" color="gray">
+                        {linkedSpotifyTrack.artists?.map(a => a.name).join(', ')}
+                      </Text>
+                    </Box>
+                  </Flex>
+                  <Button 
+                    type="button" 
+                    variant="soft" 
+                    color="red" 
+                    size="1"
+                    onClick={() => setLinkedSpotifyTrack(null)}
+                  >
+                    Remove
+                  </Button>
+                </Flex>
+              ) : (
+                <Button 
+                  type="button" 
+                  variant="soft" 
+                  color="green"
+                  onClick={() => setSpotifyModalOpen(true)}
+                >
+                  🎵 Link Spotify Track
+                </Button>
+              )}
+            </Box>
+          )}
           
            {/* Buttons */}
            <Flex justify="end" gap="2" mt="4">
@@ -230,7 +280,29 @@ return (
           <Text size="2" mt="3" color="blue">
             {message}
           </Text> )}
-      </Card>     
+      </Card>
+
+      {/* Spotify Link Modal */}
+      <LinkSpotifyTrackModal
+        open={spotifyModalOpen}
+        onOpenChange={setSpotifyModalOpen}
+        songTitle=""
+        currentSpotifyId={linkedSpotifyTrack?.id}
+        currentSpotifyUrl={linkedSpotifyTrack?.external_urls?.spotify}
+        onLink={async (spotifyId, _spotifyUrl) => {
+          // Fetch track details to store
+          const response = await fetch(`http://localhost:3001/api/spotify/tracks/${spotifyId}`, {
+            headers: { 'x-user-id': user?.id || '' },
+          })
+          if (response.ok) {
+            const track = await response.json()
+            setLinkedSpotifyTrack(track)
+          }
+        }}
+        onUnlink={async () => {
+          setLinkedSpotifyTrack(null)
+        }}
+      />
       </Box> 
         <Footer />
     </Box>

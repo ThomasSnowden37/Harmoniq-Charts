@@ -4,6 +4,8 @@ import { Button } from '@radix-ui/themes'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
+import { LinkSpotifyTrackModal } from '../features/spotify/components/LinkSpotifyTrackModal'
+import { useSpotify } from '../features/spotify/context/SpotifyContext'
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -27,10 +29,13 @@ interface Song {
     genre: string
     year_released: number
     user_id: string
+    spotify_id?: string | null
+    spotify_url?: string | null
 }
 
 export default function SongPage() {
     const { user } = useAuth()
+    const { isConnected: spotifyConnected } = useSpotify()
     const { id } = useParams()
     const [loading, setLoading] = useState(true)
     const [song, setSong] = useState<Song | null>(null)
@@ -38,6 +43,7 @@ export default function SongPage() {
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
     const [playlistOpen, setPlaylistOpen] = useState(false)
+    const [spotifyLinkOpen, setSpotifyLinkOpen] = useState(false)
     const [listenedCount, setListenedCount] = useState(0)
     const [listened, setListened] = useState(false)
     const [listento, setListento] = useState(false)
@@ -120,6 +126,20 @@ export default function SongPage() {
       {/*  Total listeners */}
       <p> Listeners: {listenedCount}</p>
 
+      {/* Spotify "Listen on Spotify" button */}
+      {song.spotify_url && (
+        <Button
+          size="2"
+          color="green"
+          className="mt-4"
+          asChild
+        >
+          <a href={song.spotify_url} target="_blank" rel="noopener noreferrer">
+            🎵 Listen on Spotify
+          </a>
+        </Button>
+      )}
+
       {/* Delete button only if user created song*/}
       {user && user.id == song.user_id && ( //User must be logged in and created for it to show up
         <>
@@ -139,6 +159,18 @@ export default function SongPage() {
       >
         Edit Song
       </Button>
+      {/* Link to Spotify button - only if Spotify connected */}
+      {spotifyConnected && (
+        <Button
+          size="2"
+          color="green"
+          variant="soft"
+          onClick={() => setSpotifyLinkOpen(true)}
+          className="mt-6"
+        >
+          {song.spotify_id ? '🔗 Update Spotify Link' : '🎵 Link to Spotify'}
+        </Button>
+      )}
         </>
       )}
 
@@ -172,6 +204,39 @@ export default function SongPage() {
         isOpen={playlistOpen}
         onClose={() => setPlaylistOpen(false)}
         songId={song.id}
+      />
+      <LinkSpotifyTrackModal
+        open={spotifyLinkOpen}
+        onOpenChange={setSpotifyLinkOpen}
+        songTitle={song.title}
+        currentSpotifyId={song.spotify_id}
+        currentSpotifyUrl={song.spotify_url}
+        onLink={async (spotifyId, spotifyUrl) => {
+          const res = await fetch(`http://localhost:3001/api/songs/${song.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': user?.id || '',
+            },
+            body: JSON.stringify({ spotify_id: spotifyId, spotify_url: spotifyUrl }),
+          })
+          if (!res.ok) throw new Error('Failed to update song')
+          const updated = await res.json()
+          setSong(updated)
+        }}
+        onUnlink={async () => {
+          const res = await fetch(`http://localhost:3001/api/songs/${song.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': user?.id || '',
+            },
+            body: JSON.stringify({ spotify_id: null, spotify_url: null }),
+          })
+          if (!res.ok) throw new Error('Failed to update song')
+          const updated = await res.json()
+          setSong(updated)
+        }}
       />
       </>
       )}

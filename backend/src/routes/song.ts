@@ -83,7 +83,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/add', async (req, res) => {
 
-    const { userId, title, bpm, genre, year_released, album_name, artist_name} = req.body
+    const { userId, title, bpm, genre, year_released, album_name, artist_name, spotify_id, spotify_url} = req.body
 
     if (!userId)
         return res.status(400).json({ error: 'Must be logged in to add song' })
@@ -188,7 +188,9 @@ router.post('/add', async (req, res) => {
             bpm,
             genre,
             year_released,
-            album_id, 
+            album_id,
+            spotify_id: spotify_id ?? null,
+            spotify_url: spotify_url ?? null,
         })
         .select()
         .single()
@@ -252,7 +254,7 @@ router.delete('/:id', async (req, res) => {
 router.patch('/:id', async (req, res) => {
     const songId = req.params.id
     const userId = req.headers['x-user-id'] as string
-    const {title, bpm, genre, year_released} = req.body
+    const {title, bpm, genre, year_released, spotify_id, spotify_url} = req.body
 
     if (!userId ) {
         return res.status(400).json({ error: 'User not logged in' })
@@ -285,7 +287,7 @@ router.patch('/:id', async (req, res) => {
 
         const{ data, error: errorUpdate} = await supabase
             .from('songs')
-            .update({ title, bpm, genre, year_released })
+            .update({ title, bpm, genre, year_released, spotify_id, spotify_url })
             .eq('id', songId)
             .select()
             .single()

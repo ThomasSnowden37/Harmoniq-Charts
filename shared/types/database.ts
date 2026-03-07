@@ -70,6 +70,8 @@ export interface Database {
           album_id: string | null
           created_at: string
           user_id: string | null
+          spotify_id: string | null
+          spotify_url: string | null
         }
         Insert: {
           id?: string
@@ -80,6 +82,8 @@ export interface Database {
           album_id?: string | null
           created_at?: string
           user_id: string | null
+          spotify_id?: string | null
+          spotify_url?: string | null
         }
         Update: {
           id?: string
@@ -90,6 +94,8 @@ export interface Database {
           album_id?: string | null
           created_at?: string
           user_id: string | null
+          spotify_id?: string | null
+          spotify_url?: string | null
         }
       }
       song_artists: {
@@ -239,6 +245,7 @@ export interface Database {
           name: string
           is_pinned: boolean
           created_at: string
+          spotify_playlist_id: string | null
         }
         Insert: {
           id?: string
@@ -246,6 +253,7 @@ export interface Database {
           name: string
           is_pinned?: boolean
           created_at?: string
+          spotify_playlist_id?: string | null
         }
         Update: {
           id?: string
@@ -253,6 +261,7 @@ export interface Database {
           name?: string
           is_pinned?: boolean
           created_at?: string
+          spotify_playlist_id?: string | null
         }
       }
       playlist_songs: {
@@ -324,6 +333,38 @@ export interface Database {
           created_at?: string
         }
       }
+      user_spotify_tokens: {
+        Row: {
+          user_id: string
+          access_token: string
+          refresh_token: string
+          expires_at: string
+          spotify_display_name: string | null
+          spotify_profile_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          access_token: string
+          refresh_token: string
+          expires_at: string
+          spotify_display_name?: string | null
+          spotify_profile_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          access_token?: string
+          refresh_token?: string
+          expires_at?: string
+          spotify_display_name?: string | null
+          spotify_profile_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }
@@ -342,3 +383,4 @@ export type Playlist = Tables['playlists']['Row']
 export type PlaylistSong = Tables['playlist_songs']['Row']
 export type Recommendation = Tables['recommendations']['Row']
 export type FriendRequest = Tables['friend_requests']['Row']
+export type UserSpotifyToken = Tables['user_spotify_tokens']['Row']

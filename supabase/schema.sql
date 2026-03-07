@@ -31,6 +31,8 @@ CREATE TABLE songs (
     album_id UUID REFERENCES albums(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE SET NULL,
+    spotify_id VARCHAR(50),
+    spotify_url TEXT
 );
 
 -- MANY TO MANY TABLES
@@ -98,7 +100,8 @@ CREATE TABLE playlists (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
     name VARCHAR(255) NOT NULL,
     is_pinned BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    spotify_playlist_id VARCHAR(50)
 );
 
 CREATE TABLE playlist_songs (
@@ -124,6 +127,18 @@ CREATE TABLE playlist_comments (
     playlist_id UUID REFERENCES playlists(id) ON DELETE CASCADE NOT NULL,
     content TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- SPOTIFY TOKENS
+CREATE TABLE user_spotify_tokens (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    spotify_display_name VARCHAR(255),
+    spotify_profile_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- FRIEND REQUESTS
