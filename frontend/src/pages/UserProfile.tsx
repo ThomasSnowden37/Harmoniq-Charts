@@ -60,13 +60,15 @@ export default function UserProfile() {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [friendCount, setFriendCount] = useState(0)
+  const [likedSongs, setLikedSongs] = useState<{ id: string; title: string; genre: string; year_released: number; bpm: number }[]>([])
+  const [userReviews, setUserReviews] = useState<{ id: string; content: string; created_at: string; song_id: string; songs: { id: string; title: string; genre: string; year_released: number } }[]>([])
   const [deleteUserModal, setDeleteUserModal] = useState(false)
 
   const isOwnProfile = userId === MOCK_CURRENT_USER_ID
 
   // TODO: Replace with real data from API
   const stats = {
-    reviews: 0,
+    reviews: userReviews.length,
     friends: friendCount,
     playlists: playlists.length,
   }
@@ -76,6 +78,8 @@ export default function UserProfile() {
     fetchProfile()
     fetchPlaylists()
     fetchFriendCount()
+    fetchLikedSongs()
+    fetchUserReviews()
     if (!isOwnProfile) {
       fetchRelationship()
     }
@@ -109,6 +113,24 @@ export default function UserProfile() {
       }
     } catch (err) {
       console.error('Failed to fetch friend count:', err)
+    }
+  }
+
+  async function fetchUserReviews() {
+    try {
+      const res = await fetch(`/api/reviews/user/${userId}`)
+      if (res.ok) setUserReviews(await res.json())
+    } catch (err) {
+      console.error('Failed to fetch reviews:', err)
+    }
+  }
+
+  async function fetchLikedSongs() {
+    try {
+      const res = await fetch(`/api/likes/user/${userId}`)
+      if (res.ok) setLikedSongs(await res.json())
+    } catch (err) {
+      console.error('Failed to fetch liked songs:', err)
     }
   }
 
@@ -353,23 +375,43 @@ export default function UserProfile() {
             <Tabs.List>
               <Tabs.Trigger value="reviews">Reviews</Tabs.Trigger>
               <Tabs.Trigger value="playlists">Playlists</Tabs.Trigger>
+              <Tabs.Trigger value="liked">Liked Songs</Tabs.Trigger>
             </Tabs.List>
 
             <Tabs.Content value="reviews">
               <Card size="3" mt="3">
                 <Heading size="4" mb="4">Reviews</Heading>
-                {stats.reviews === 0 ? (
+                {userReviews.length === 0 ? (
                   <Flex direction="column" align="center" py="6">
                     <Text color="gray">No reviews yet.</Text>
                     {isOwnProfile && (
                       <Text size="2" color="gray" mt="1">
-                        Share your thoughts on your favorite music!
+                        Visit a song page to leave your first review!
                       </Text>
                     )}
                   </Flex>
                 ) : (
-                  <Flex direction="column" gap="4">
-                    {/* TODO: Map over real reviews here */}
+                  <Flex direction="column" gap="3">
+                    {userReviews.map(review => (
+                      <Box key={review.id} className="p-3 rounded-lg border border-border">
+                        <Flex justify="between" align="center" mb="1">
+                          <a href={`/songs/${review.songs.id}`} className="no-underline">
+                            <Text weight="medium" className="text-foreground hover:text-primary">
+                              {review.songs.title}
+                            </Text>
+                            <Text size="1" color="gray" ml="2">
+                              {review.songs.genre} · {review.songs.year_released}
+                            </Text>
+                          </a>
+                          <Text size="1" color="gray">
+                            {new Date(review.created_at).toLocaleDateString()}
+                          </Text>
+                        </Flex>
+                        <Text size="2" className="text-foreground whitespace-pre-wrap">
+                          {review.content}
+                        </Text>
+                      </Box>
+                    ))}
                   </Flex>
                 )}
               </Card>
@@ -381,6 +423,36 @@ export default function UserProfile() {
                 setPlaylists={setPlaylists}
                 isOwnProfile={isOwnProfile}
               />
+            </Tabs.Content>
+
+            <Tabs.Content value="liked">
+              <Card size="3" mt="3">
+                <Heading size="4" mb="4">Liked Songs</Heading>
+                {likedSongs.length === 0 ? (
+                  <Flex direction="column" align="center" py="6">
+                    <Text color="gray">No liked songs yet.</Text>
+                    {isOwnProfile && (
+                      <Text size="2" color="gray" mt="1">
+                        Like a song on its page and it will appear here.
+                      </Text>
+                    )}
+                  </Flex>
+                ) : (
+                  <Flex direction="column" gap="2">
+                    {likedSongs.map(song => (
+                      <a key={song.id} href={`/songs/${song.id}`} className="no-underline">
+                        <Box className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary transition-colors">
+                          <Box>
+                            <Text weight="medium" className="text-foreground block">{song.title}</Text>
+                            <Text size="1" color="gray">{song.genre} · {song.year_released} · {song.bpm} BPM</Text>
+                          </Box>
+                          <Text size="1" color="red">♥</Text>
+                        </Box>
+                      </a>
+                    ))}
+                  </Flex>
+                )}
+              </Card>
             </Tabs.Content>
           </Tabs.Root>
         )}
