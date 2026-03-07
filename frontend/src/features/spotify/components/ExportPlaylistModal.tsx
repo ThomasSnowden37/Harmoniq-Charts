@@ -5,8 +5,6 @@ import { MOCK_CURRENT_USER_ID } from '../../../lib/auth'
 import { useSpotify } from '../context/SpotifyContext'
 import type { ExportResult } from '../types'
 
-const API_BASE = 'http://localhost:3001/api/spotify'
-
 interface ExportPlaylistModalProps {
   isOpen: boolean
   onClose: () => void
@@ -43,7 +41,7 @@ export default function ExportPlaylistModal({
     setExporting(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE}/export-playlist/${playlistId}`, {
+      const res = await fetch(`/api/spotify/export-playlist/${playlistId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

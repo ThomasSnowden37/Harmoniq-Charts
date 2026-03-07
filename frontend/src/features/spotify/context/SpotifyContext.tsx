@@ -2,8 +2,6 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { MOCK_CURRENT_USER_ID } from '../../../lib/auth'
 import type { SpotifyConnectionStatus } from '../types'
 
-const API_BASE = 'http://localhost:3001/api/spotify'
-
 interface SpotifyContextType {
   isConnected: boolean
   isLoading: boolean
@@ -27,7 +25,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/connection-status`, {
+      const res = await fetch(`/api/spotify/connection-status`, {
         headers: {
           'x-user-id': MOCK_CURRENT_USER_ID,
         },
@@ -74,7 +72,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/auth/url`, {
+      const res = await fetch(`/api/spotify/auth/url`, {
         headers: {
           'x-user-id': MOCK_CURRENT_USER_ID,
         },
@@ -97,7 +95,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
     if (!MOCK_CURRENT_USER_ID) return
 
     try {
-      const res = await fetch(`${API_BASE}/disconnect`, {
+      const res = await fetch(`/api/spotify/disconnect`, {
         method: 'DELETE',
         headers: {
           'x-user-id': MOCK_CURRENT_USER_ID,

@@ -60,7 +60,7 @@ export default function CreateSong() {
     const album_name = form.get('album')?.toString() ?? ''
     const artist_name = form.get('artist')?.toString() ?? ''
     try {
-        const res = await fetch('http://localhost:3001/api/songs/add', {
+        const res = await fetch('/api/songs/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-user-id': userId,},
           body: JSON.stringify({
@@ -291,7 +291,7 @@ return (
         currentSpotifyUrl={linkedSpotifyTrack?.external_urls?.spotify}
         onLink={async (spotifyId, _spotifyUrl) => {
           // Fetch track details to store
-          const response = await fetch(`http://localhost:3001/api/spotify/tracks/${spotifyId}`, {
+          const response = await fetch(`/api/spotify/tracks/${spotifyId}`, {
             headers: { 'x-user-id': user?.id || '' },
           })
           if (response.ok) {

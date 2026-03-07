@@ -5,8 +5,6 @@ import { useSpotify } from '../context/SpotifyContext'
 import { MOCK_CURRENT_USER_ID } from '../../../lib/auth'
 import type { SpotifyTrack } from '../types'
 
-const API_BASE = 'http://localhost:3001/api/spotify'
-
 interface LinkSpotifyTrackModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -55,7 +53,7 @@ export function LinkSpotifyTrackModal({
     if (!currentSpotifyId) return
 
     try {
-      const response = await fetch(`${API_BASE}/tracks/${currentSpotifyId}`, {
+      const response = await fetch(`/api/spotify/tracks/${currentSpotifyId}`, {
         headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
       })
 
@@ -77,7 +75,7 @@ export function LinkSpotifyTrackModal({
 
     try {
       const response = await fetch(
-        `${API_BASE}/search?q=${encodeURIComponent(searchQuery)}&limit=10`,
+        `/api/spotify/search?q=${encodeURIComponent(searchQuery)}&limit=10`,
         { headers: { 'x-user-id': MOCK_CURRENT_USER_ID } }
       )
 

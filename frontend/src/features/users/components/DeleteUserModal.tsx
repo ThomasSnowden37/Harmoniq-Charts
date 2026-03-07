@@ -29,7 +29,7 @@ async function handleDelete() {
     setError(null)
     try {
         const res = await fetch(
-            `http://localhost:3001/api/users/${user.id}`,
+            `/api/users/${user.id}`,
             { method: 'DELETE',
               headers: {
                 'x-user-id': user.id 

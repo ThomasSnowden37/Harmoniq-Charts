@@ -5,8 +5,6 @@ import { MOCK_CURRENT_USER_ID } from '../../../lib/auth'
 import { useSpotify } from '../context/SpotifyContext'
 import type { SpotifyPlaylist, ImportResult } from '../types'
 
-const API_BASE = 'http://localhost:3001/api/spotify'
-
 interface ImportPlaylistModalProps {
   isOpen: boolean
   onClose: () => void
@@ -42,7 +40,7 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE}/playlists`, {
+      const res = await fetch(`/api/spotify/playlists`, {
         headers: {
           'x-user-id': MOCK_CURRENT_USER_ID,
         },
@@ -68,7 +66,7 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
     setImporting(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE}/import-playlist`, {
+      const res = await fetch(`/api/spotify/import-playlist`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -55,7 +55,7 @@ export default function SongPage() {
       async function fetchSong() {
         setLoading(true)
         try {
-          const res = await fetch(`http://localhost:3001/api/songs/${id}`)
+          const res = await fetch(`/api/songs/${id}`)
           const data = await res.json()
 
           if (!res.ok) {
@@ -66,7 +66,7 @@ export default function SongPage() {
           setSong(data)
 
           const countRes = await fetch(
-            `http://localhost:3001/api/songs/${id}/listened/count`
+            `/api/songs/${id}/listened/count`
           )
           const countData = await countRes.json()
           if (countRes.ok) setListenedCount(countData.total)
@@ -90,14 +90,14 @@ export default function SongPage() {
       async function fetchUserSongData() {
       try {
         const resLis = await fetch(
-          `http://localhost:3001/api/songs/${id}/listened`,
+          `/api/songs/${id}/listened`,
           { headers: { 'x-user-id': userId } }
         )
         const listenedData = await resLis.json()
         if (resLis.ok) setListened(listenedData.listened)
 
         const toLis = await fetch(
-          `http://localhost:3001/api/songs/${id}/listento`,
+          `/api/songs/${id}/listento`,
           { headers: { 'x-user-id': userId } }
         )
         const listentoData = await toLis.json()
@@ -212,7 +212,7 @@ export default function SongPage() {
         currentSpotifyId={song.spotify_id}
         currentSpotifyUrl={song.spotify_url}
         onLink={async (spotifyId, spotifyUrl) => {
-          const res = await fetch(`http://localhost:3001/api/songs/${song.id}`, {
+          const res = await fetch(`/api/songs/${song.id}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
@@ -225,7 +225,7 @@ export default function SongPage() {
           setSong(updated)
         }}
         onUnlink={async () => {
-          const res = await fetch(`http://localhost:3001/api/songs/${song.id}`, {
+          const res = await fetch(`/api/songs/${song.id}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
@@ -250,7 +250,7 @@ export default function SongPage() {
       if (!user) return alert("You must be logged in to mark as listened")
       try {
       const method = listened ? 'DELETE' : 'POST'
-      const res = await fetch(`http://localhost:3001/api/songs/${id}/listened`, {
+      const res = await fetch(`/api/songs/${id}/listened`, {
         method,
         headers: { 'x-user-id': user.id }
       })
@@ -276,7 +276,7 @@ export default function SongPage() {
       if (!user) return alert("You must be logged in to mark as listen to")
       try {
       const method = listento? 'DELETE' : 'POST'
-      const res = await fetch(`http://localhost:3001/api/songs/${id}/listento`, {
+      const res = await fetch(`/api/songs/${id}/listento`, {
         method,
         headers: { 'x-user-id': user.id }
       })
