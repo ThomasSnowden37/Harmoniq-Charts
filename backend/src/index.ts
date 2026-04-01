@@ -10,6 +10,7 @@ import authRouter from './routes/auth.js'
 import playlistRouter from './routes/playlists.js'
 import likesRouter from './routes/likes.js'
 import reviewsRouter from './routes/reviews.js'
+import ratingsRouter from './routes/ratings.js'
 
 dotenv.config()
 
@@ -27,6 +28,7 @@ app.use('/api/auth', authRouter)
 app.use('/api/playlists', playlistRouter)
 app.use('/api/likes', likesRouter)
 app.use('/api/reviews', reviewsRouter)
+app.use('/api/ratings', ratingsRouter)
 
 // Test the supabase connection with this endpoint
 app.get('/api/test-db', async (req, res) => {
