@@ -51,7 +51,15 @@ export default function PlaylistSection({ playlists, setPlaylists, isOwnProfile 
                 <Link to={`/playlists/${playlist.id}`} className="flex-1 min-w-0">
                   <Text weight="medium">{playlist.name}</Text>
                   <Text size="1" color="gray" as="p">
-                    {playlist.song_count || 0} {playlist.song_count === 1 ? 'song' : 'songs'}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <Text size="1" color="gray" as="span">{playlist.song_count || 0}</Text>
+                      <Text size="1" color="gray" as="span">{playlist.song_count === 1 ? 'song' : 'songs'}</Text>
+                    </span>
+                    <span style={{ margin: '0 8px', color: 'var(--gray-9)' }}>·</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <Text size="1" color="gray" as="span">{playlist.likes_count || 0}</Text>
+                      <Text size="1" color={playlist.liked ? 'blue' : 'gray'} as="span">{playlist.liked ? '♥' : '♡'}</Text>
+                    </span>
                   </Text>
                 </Link>
                 {isOwnProfile && (

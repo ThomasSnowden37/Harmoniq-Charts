@@ -8,9 +8,22 @@ function getUserId(req: any): string | null {
   return req.headers['x-user-id'] as string || null
 }
 
-// Get all playlists for a user (with song counts)
+// Get number of playlists for a user
+router.get('/user/:userId/count', async (req, res) => {
+  const { userId } = req.params
+
+  const { count } = await supabase
+    .from('playlists')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+
+  res.json({ playlists: count ?? 0 })
+})
+
+// Get all playlists for a user (with song counts and likes count)
 router.get('/user/:userId', async (req, res) => {
   const { userId } = req.params
+  const requesterId = req.headers['x-user-id'] as string | undefined
   const { data: playlists, error } = await supabase
     .from('playlists')
     .select('*')
@@ -30,7 +43,32 @@ router.get('/user/:userId', async (req, res) => {
   const countMap = new Map<string, number>()
   counts?.forEach(c => countMap.set(c.playlist_id, (countMap.get(c.playlist_id) || 0) + 1))
 
-  res.json(playlists.map(p => ({ ...p, song_count: countMap.get(p.id) || 0 })))
+  // Get likes counts for all playlists
+  const { data: likes } = await supabase
+    .from('playlist_likes')
+    .select('playlist_id')
+    .in('playlist_id', playlistIds)
+
+  const likesMap = new Map<string, number>()
+  likes?.forEach(l => likesMap.set(l.playlist_id, (likesMap.get(l.playlist_id) || 0) + 1))
+
+  // If there's a requester, fetch which playlists they have liked (so UI can show liked state)
+  const likedSet = new Set<string>()
+  if (requesterId) {
+    const { data: userLikes } = await supabase
+      .from('playlist_likes')
+      .select('playlist_id')
+      .eq('user_id', requesterId)
+      .in('playlist_id', playlistIds)
+    userLikes?.forEach(l => likedSet.add(l.playlist_id))
+  }
+
+  res.json(playlists.map(p => ({
+    ...p,
+    song_count: countMap.get(p.id) || 0,
+    likes_count: likesMap.get(p.id) || 0,
+    liked: likedSet.has(p.id) || false,
+  })))
 })
 
 // Helper to check if a user can access a playlist (based on privacy)

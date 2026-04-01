@@ -59,6 +59,8 @@ export default function UserProfile() {
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [playlists, setPlaylists] = useState<Playlist[]>([])
+  const [playlistCount, setPlaylistCount] = useState(0)
+  const [playlistsLoaded, setPlaylistsLoaded] = useState(false)
   const [friendCount, setFriendCount] = useState(0)
   const [likedSongs, setLikedSongs] = useState<{ id: string; title: string; genre: string; year_released: number; bpm: number }[]>([])
   const [userReviews, setUserReviews] = useState<{ id: string; content: string; created_at: string; song_id: string; songs: { id: string; title: string; genre: string; year_released: number } }[]>([])
@@ -70,13 +72,13 @@ export default function UserProfile() {
   const stats = {
     reviews: userReviews.length,
     friends: friendCount,
-    playlists: playlists.length,
+    playlists: playlistCount,
   }
 
   useEffect(() => {
     if (!userId) return
     fetchProfile()
-    fetchPlaylists()
+    fetchPlaylistCount()
     fetchFriendCount()
     fetchLikedSongs()
     fetchUserReviews()
@@ -136,10 +138,29 @@ export default function UserProfile() {
 
   async function fetchPlaylists() {
     try {
-      const res = await fetch(`/api/playlists/user/${userId}`)
-      if (res.ok) setPlaylists(await res.json())
+      const res = await fetch(`/api/playlists/user/${userId}`, {
+        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setPlaylists(data)
+        setPlaylistCount(data.length)
+        setPlaylistsLoaded(true)
+      }
     } catch (err) {
       console.error('Failed to fetch playlists:', err)
+    }
+  }
+
+  async function fetchPlaylistCount() {
+    try {
+      const res = await fetch(`/api/playlists/user/${userId}/count`)
+      if (res.ok) {
+        const data = await res.json()
+        setPlaylistCount(data.playlists || 0)
+      }
+    } catch (err) {
+      console.error('Failed to fetch playlist count:', err)
     }
   }
 
@@ -371,7 +392,13 @@ export default function UserProfile() {
           </Card>
         ) : (
           /* Reviews & Playlists Tabs */
-          <Tabs.Root defaultValue="reviews" className="mt-5">
+          <Tabs.Root
+            defaultValue="reviews"
+            onValueChange={(val: string) => {
+              if (val === 'playlists' && !playlistsLoaded) fetchPlaylists()
+            }}
+            className="mt-5"
+          >
             <Tabs.List>
               <Tabs.Trigger value="reviews">Reviews</Tabs.Trigger>
               <Tabs.Trigger value="playlists">Playlists</Tabs.Trigger>

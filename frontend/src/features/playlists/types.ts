@@ -5,6 +5,8 @@ export interface Playlist {
   is_pinned: boolean
   created_at: string
   song_count?: number
+  likes_count?: number
+  liked?: boolean
 }
 
 export interface PlaylistWithSongs extends Playlist {
