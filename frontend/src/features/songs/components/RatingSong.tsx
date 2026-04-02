@@ -24,6 +24,7 @@ export default function RatingSong({ id }:StarRatingProps) {
             if (!user || !id) return
             const userId = user.id
             setLoading(false)
+            await fetchAverage()
             try {
                 //fetch the users rating
                 const res = await fetch(
@@ -37,15 +38,6 @@ export default function RatingSong({ id }:StarRatingProps) {
                 }
                 setRating(data.rating)
 
-                //fetch the average rating
-                const Avgres = await fetch(
-                `http://localhost:3001/api/ratings/${id}/average`)
-                const avgData = await Avgres.json()
-                if (!Avgres.ok) {
-                    setError(data.error || 'Failed to load song rating')
-                    return
-                }
-                setAverage(avgData?.average ?? null)
             } catch (err) {
                 setError('Failed to load song rating')
                 return
