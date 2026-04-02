@@ -47,7 +47,24 @@ export default function SearchPage() {
             ratings!inner (*)
           `)
           .order('title', { ascending: true });
+      } else if (column === 'album') {
+        //Force an INNER JOIN on albums so singles are excluded when searching by album
+        queryBuilder = supabase
+          .from('songs')
+          .select(`
+            *,
+            albums!inner (*),
+            song_artists!inner (
+              artists!inner (*)
+            ),
+            likes (*),
+            listened (*),
+            listento (*),
+            ratings (*)
+          `)
+          .order('title', { ascending: true });
       } else {
+        // Default query for title, artist, bpm, etc.
         queryBuilder = supabase
           .from('songs')
           .select(`
@@ -147,26 +164,23 @@ export default function SearchPage() {
     };
 
   // Helper to calculate average rating and draw stars
-  const renderStars = (ratings: any[]) => {
+  const renderStars = (ratings: any[], field: string) => {
+    const isActive = column === field;
+
     if (!ratings || ratings.length === 0) {
-      return <span className="text-muted-foreground text-sm">Unrated</span>;
+      const fallback = <span className="text-muted-foreground text-sm">Unrated</span>;
+      return isActive ? <strong>{fallback}</strong> : fallback;
     }
     
-    // Calculate the average rating
     const avg = ratings.reduce((acc, curr) => acc + curr.rating, 0) / ratings.length;
     
-    return (
+    const starContent = (
       <div className="flex items-center" title={`${avg.toFixed(1)} out of 5`}>
         <div className="flex tracking-widest">
           {[1, 2, 3, 4, 5].map((star) => {
-            // Calculate how much of this specific star should be filled (from 0 to 1)
             const fill = Math.max(0, Math.min(1, avg - (star - 1)));
-            
             return (
-              <span
-                key={star}
-                className="relative text-lg text-muted-foreground/30"
-              >
+              <span key={star} className="relative text-lg text-muted-foreground/30">
                 ★
                 <span
                   className="absolute left-0 top-0 overflow-hidden text-yellow-400"
@@ -178,10 +192,11 @@ export default function SearchPage() {
             );
           })}
         </div>
-        {/* Optional: Show the exact number next to the stars */}
         <span className="text-xs text-muted-foreground ml-2">({avg.toFixed(1)})</span>
       </div>
     );
+
+    return isActive ? <strong className="flex items-center">{starContent}</strong> : starContent;
   };
 
     // update for checking
@@ -311,7 +326,7 @@ export default function SearchPage() {
                               <div className="flex-1">Genre: {renderBold(song.genre, "genre")} </div>
                               <div className="flex-1">Bpm: {renderBold(song.bpm, "bpm")}</div>
                               <div className="flex-1 min-w-[150px] flex items-center gap-2">
-                                Rating: {renderStars(song.ratings)}
+                                Rating: {renderStars(song.ratings, "rating")}
                               </div>
                           </div>
                         </div>
