@@ -263,18 +263,21 @@ export interface Database {
           id: string
           playlist_id: string
           song_id: string
+          position: number
           added_at: string
         }
         Insert: {
           id?: string
           playlist_id: string
           song_id: string
+          position?: number
           added_at?: string
         }
         Update: {
           id?: string
           playlist_id?: string
           song_id?: string
+          position?: number
           added_at?: string
         }
       }
@@ -327,6 +330,29 @@ export interface Database {
           created_at?: string
         }
       }
+      favorite_songs: {
+        Row: {
+          id: string
+          user_id: string
+          song_id: string
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          song_id: string
+          position: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          song_id?: string
+          position?: number
+          created_at?: string
+        }
+      }
     }
   }
 }
@@ -345,3 +371,4 @@ export type Playlist = Tables['playlists']['Row']
 export type PlaylistSong = Tables['playlist_songs']['Row']
 export type Recommendation = Tables['recommendations']['Row']
 export type FriendRequest = Tables['friend_requests']['Row']
+export type FavoriteSong = Tables['favorite_songs']['Row']

@@ -103,7 +103,7 @@ router.get('/user/:userId', async (req, res) => {
 
   const { data, error } = await supabase
     .from('likes')
-    .select('song_id, created_at, songs(id, title, genre, year_released, bpm)')
+    .select('song_id, created_at, songs(id, title, genre, year_released, bpm, song_artists(artists(id, name)))')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
 

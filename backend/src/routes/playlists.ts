@@ -119,22 +119,24 @@ router.get('/:id', async (req, res) => {
     .select(`
       id,
       added_at,
+      position,
       songs (
         id,
         title,
         bpm,
         genre,
-        year_released
+        year_released,
+        song_artists(artists(id, name))
       )
     `)
     .eq('playlist_id', id)
-    .order('added_at', { ascending: false })
+    .order('position', { ascending: true })
 
   if (songsError) return res.status(500).json({ error: songsError.message })
 
   res.json({
     ...playlist,
-    songs: songs?.map(s => ({ ...s.songs, added_at: s.added_at })) || []
+    songs: songs?.map(s => ({ ...s.songs, added_at: s.added_at, position: s.position })) || []
   })
 })
 
@@ -218,6 +220,36 @@ router.patch('/:id', async (req, res) => {
   res.json(data)
 })
 
+// Pin/unpin a playlist
+router.patch('/:id/pin', async (req, res) => {
+  const userId = getUserId(req)
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  const { id } = req.params
+  const { is_pinned } = req.body
+
+  if (typeof is_pinned !== 'boolean') return res.status(400).json({ error: 'is_pinned must be a boolean' })
+
+  const { data: playlist } = await supabase
+    .from('playlists')
+    .select('user_id')
+    .eq('id', id)
+    .single()
+
+  if (!playlist) return res.status(404).json({ error: 'Playlist not found' })
+  if (playlist.user_id !== userId) return res.status(403).json({ error: 'Forbidden' })
+
+  const { data, error } = await supabase
+    .from('playlists')
+    .update({ is_pinned })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
+})
+
 // Delete playlist
 router.delete('/:id', async (req, res) => {
   const userId = getUserId(req)
@@ -262,9 +294,19 @@ router.post('/:id/songs', async (req, res) => {
   if (!playlist) return res.status(404).json({ error: 'Playlist not found' })
   if (playlist.user_id !== userId) return res.status(403).json({ error: 'Forbidden' })
 
+  // Get the next position
+  const { data: existingSongs } = await supabase
+    .from('playlist_songs')
+    .select('position')
+    .eq('playlist_id', id)
+    .order('position', { ascending: false })
+    .limit(1)
+
+  const nextPosition = existingSongs && existingSongs.length > 0 ? existingSongs[0].position + 1 : 0
+
   const { data, error } = await supabase
     .from('playlist_songs')
-    .insert({ playlist_id: id, song_id: songId })
+    .insert({ playlist_id: id, song_id: songId, position: nextPosition })
     .select()
     .single()
 
@@ -302,9 +344,85 @@ router.delete('/:id/songs/:songId', async (req, res) => {
   res.json({ message: 'Song removed from playlist' })
 })
 
+// Reorder songs in a playlist
+router.put('/:id/reorder', async (req, res) => {
+  const userId = getUserId(req)
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  const { id } = req.params
+  const { songIds } = req.body // array of song IDs in desired order
+
+  if (!Array.isArray(songIds) || songIds.length === 0) {
+    return res.status(400).json({ error: 'songIds array is required' })
+  }
+
+  const { data: playlist } = await supabase
+    .from('playlists')
+    .select('user_id')
+    .eq('id', id)
+    .single()
+
+  if (!playlist) return res.status(404).json({ error: 'Playlist not found' })
+  if (playlist.user_id !== userId) return res.status(403).json({ error: 'Forbidden' })
+
+  // Update each song's position
+  const updates = songIds.map((songId: string, index: number) =>
+    supabase
+      .from('playlist_songs')
+      .update({ position: index })
+      .eq('playlist_id', id)
+      .eq('song_id', songId)
+  )
+
+  const results = await Promise.all(updates)
+  const failed = results.find(r => r.error)
+  if (failed?.error) return res.status(500).json({ error: failed.error.message })
+
+  res.json({ message: 'Songs reordered' })
+})
+
+// ============ PLAYLIST LISTENED PROGRESS ============
+
+// Get how many songs the current user has listened to in a playlist
+router.get('/:id/listened-progress', async (req, res) => {
+  const { id } = req.params
+  const userId = req.headers['x-user-id'] as string
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+
+  const { allowed } = await canAccessPlaylist(id, userId)
+  if (!allowed) return res.status(403).json({ error: 'This playlist belongs to a private account' })
+
+  // Get all song IDs in the playlist
+  const { data: playlistSongs, error: psError } = await supabase
+    .from('playlist_songs')
+    .select('song_id')
+    .eq('playlist_id', id)
+
+  if (psError) return res.status(500).json({ error: psError.message })
+
+  const totalSongs = playlistSongs?.length || 0
+  if (totalSongs === 0) return res.json({ total: 0, listened: 0, percentage: 0 })
+
+  const songIds = playlistSongs!.map(ps => ps.song_id)
+
+  // Count how many of those the user has listened to
+  const { data: listenedSongs, error: lError } = await supabase
+    .from('listened')
+    .select('song_id')
+    .eq('user_id', userId)
+    .in('song_id', songIds)
+
+  if (lError) return res.status(500).json({ error: lError.message })
+
+  const listenedCount = listenedSongs?.length || 0
+  const percentage = Math.round((listenedCount / totalSongs) * 100)
+
+  res.json({ total: totalSongs, listened: listenedCount, percentage })
+})
+
 // ============ PLAYLIST LIKES ============
 
-// Get likes for a playlist
+// Get likes count for a playlist
 router.get('/:id/likes', async (req, res) => {
   const { id } = req.params
   const requesterId = req.headers['x-user-id'] as string | undefined
@@ -312,14 +430,13 @@ router.get('/:id/likes', async (req, res) => {
   const { allowed } = await canAccessPlaylist(id, requesterId)
   if (!allowed) return res.status(403).json({ error: 'This playlist belongs to a private account' })
 
-  const { data: likes, error } = await supabase
+  const { count, error } = await supabase
     .from('playlist_likes')
-    .select('*, users(id, username)')
+    .select('*', { count: 'exact', head: true })
     .eq('playlist_id', id)
-    .order('created_at', { ascending: false })
 
   if (error) return res.status(500).json({ error: error.message })
-  res.json(likes)
+  res.json({ count: count ?? 0 })
 })
 
 // Check if current user liked a playlist

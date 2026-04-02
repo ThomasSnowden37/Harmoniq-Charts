@@ -21,6 +21,9 @@ export interface PlaylistSong {
   genre: string
   year_released: number
   added_at: string
+  position: number
+  // optional nested artist info from the backend: song_artists -> artists
+  song_artists?: Array<{ artists?: { id: string; name: string } }>
 }
 
 export interface PlaylistCheckItem {
