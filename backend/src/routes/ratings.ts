@@ -103,19 +103,26 @@ router.delete('/:id/remove', async (req, res) => {
  */
 router.get('/:id/average', async (req, res) => {
     const songId = req.params.id;
+    console.log('in')
 
     if (!songId) return res.status(400).json({ error: 'Song id is required' })
 
     const { data, error } = await supabase
         .from('ratings')
-        .select('avg:rating.avg()')
+        .select('rating')
         .eq('song_id', songId)
-        .single()
-
+        
     if (error) {
-        return res.status(500).json({ error: 'Failed to find song' })
+        return res.status(500).json({ error: 'Failed to fetch ratings' })
     }
-    res.json({ average: data?.avg ?? null })
+
+    const ratings = data?.map(r => r.rating) ?? []
+    const average =
+        ratings.length > 0
+        ? ratings.reduce((acc, r) => acc + r, 0) / ratings.length
+        : null
+    console.log({ average })
+    res.json({ average })
 })
 
 
