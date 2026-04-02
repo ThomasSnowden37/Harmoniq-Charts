@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import { useNavigate } from "react-router-dom";
 
-export default function SearchPage() {
+export default function RecommendPage() {
   const [query, setQuery] = useState('');
   const [column, setColumn] = useState<
   'title' | 'artist' | 'album' | 'genre' | 'bpm' | 'songwriter' | 'singles_by_artist'
@@ -29,7 +29,6 @@ export default function SearchPage() {
   setLoading(true);
 
   try {
-    // select the songs
     let queryBuilder = supabase
       .from('songs')
       .select(`
@@ -62,13 +61,15 @@ export default function SearchPage() {
       queryBuilder = queryBuilder.is('album_id', null);
     }
 
+
+    if (singlesOnly) queryBuilder = queryBuilder.is('album_id', null);
+
     const { data, error } = await queryBuilder;
 
     if (error) {
       console.error(error);
       setSongs([]);
-    } 
-    else {
+    } else {
       let filtered = data || [];
 
       // filters that are user-specific
@@ -97,15 +98,32 @@ export default function SearchPage() {
 
     }
 
-  } 
-  catch (err) {
+  } catch (err) {
     console.error(err);
     setSongs([]);
   }
   
-  setLoading(false);
-  setFirstSearch(false);
-};
+
+    setLoading(false);
+    setFirstSearch(false);
+    };
+
+
+    const handleRandom = async () => {
+    setLoading(true);
+
+    const { data, error } = await supabase.rpc('get_random_song');
+
+    if (error) {
+        console.error(error);
+        setSongs([]);
+    } else {
+        setSongs(data || []);
+    }
+
+    setLoading(false);
+    setFirstSearch(false);
+    };  
 
   // Makes the selected column appear bolded
   const renderBold = (value: string | number | { name: string } | undefined, field: string) => {
@@ -141,9 +159,9 @@ export default function SearchPage() {
     <Navbar />
       <div className="min-h-screen w-full flex items-center justify-center bg-background">
         <div className="w-full max-w-2xl mx-4 bg-card rounded-2xl shadow-xl p-8">
-          <h1 className="text-3xl font-semibold text-center mb-2 text-primary">Song Lookup</h1>
+          <h1 className="text-3xl font-semibold text-center mb-2 text-primary">Recommend Song Select</h1>
           <p className="text-center text-muted-foreground mb-6">
-            Use the dropdown menu to select what to search by
+            Use the dropdown menu to select what to search by or press the randomize button for a random song selection
           </p>
 
           <form onSubmit={onSubmit} className="flex items-center gap-3">
@@ -210,6 +228,22 @@ export default function SearchPage() {
             </div>
           </div>
 
+            <div className="mt-2 text-center">
+            --- OR ---
+            </div>
+
+          {/* Randomize  button */}
+          <div className="mt-4 flex justify-center">
+            <Button
+              type="button"
+              onClick={handleRandom}
+              size="4"
+              color="green"
+            >
+              Randomize me a Song!
+            </Button>
+        </div>
+
           {/* Results */}
           <div className="mt-8">
             {loading && <p className="text-muted-foreground">Loading...</p>}
@@ -258,7 +292,7 @@ export default function SearchPage() {
                     <Button
                       variant="ghost"
                       size="2"
-                      onClick={() => navigate(`/songs/${song.id}`)}
+                      onClick={() => navigate(`/recommend/${song.id}`)}
                     >
                       <ArrowRight className="w-5 h-5" />
                     </Button>

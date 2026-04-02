@@ -20,6 +20,11 @@ export default function Navbar() {
         <Link to="/" className="no-underline">
           <img src={logo} alt="Harmoniq" className="h-10" />
         </Link>
+        <Link to="/usersearch" className="no-underline">
+          <div className="border-4 border-solid border-border px-4 rounded-md">
+            <Text size="2" className="text-foreground tracking-tight">User Lookup</Text>
+          </div>
+        </Link>
         <Link to="/search" className="no-underline">
           <div className="border-4 border-solid border-border px-4 rounded-md">
             <Text size="2" className="text-foreground tracking-tight">Song Lookup</Text>
@@ -28,6 +33,11 @@ export default function Navbar() {
         <Link to="/songs/add" className="no-underline">
           <div className="border-4 border-solid border-border px-4 rounded-md">
             <Text size="2" className="text-foreground tracking-tight">Add Song</Text>
+          </div>
+        </Link>
+        <Link to="/recommend" className="no-underline">
+          <div className="border-4 border-solid border-border px-4 rounded-md">
+            <Text size="2" className="text-foreground tracking-tight">Recommend Song</Text>
           </div>
         </Link>
         <Flex gap="3" align="center">
