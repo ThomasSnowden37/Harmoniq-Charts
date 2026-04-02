@@ -49,6 +49,7 @@ export default function SongPage() {
     const [submittingReview, setSubmittingReview] = useState(false)
     const [albumLoading, setAlbumLoading] = useState<'listento' | 'listened' | null>(null);
     const [albumSuccess, setAlbumSuccess] = useState<'listento' | 'listened' | null>(null);
+    const [albumPlaylistOpen, setAlbumPlaylistOpen] = useState(false)
 
     const MAX_CHARS = 500
     const userReview = reviews.find(r => r.user_id === user?.id)
@@ -234,6 +235,13 @@ const handleAddAlbum = async (target: 'listento' | 'listened') => {
         onClose={() => setPlaylistOpen(false)}
         songId={song.id}
       />
+      {song.album_id && (
+                <AddToPlaylistModal
+                    isOpen={albumPlaylistOpen}
+                    onClose={() => setAlbumPlaylistOpen(false)}
+                    albumId={song.album_id} 
+                />
+      )}
       </>
       )}
     {user && ( //User must be logged in for it to show up
@@ -315,15 +323,17 @@ const handleAddAlbum = async (target: 'listento' | 'listened') => {
   </Button>
       </>
   )}
+  {/* Album Actions Section */}
   {user && song.album_id && (
     <div className="mb-12 p-6 rounded-2xl border border-dashed border-border bg-card/50 max-w-md w-full">
       <h3 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wider">Full Album Actions</h3>
-        <div className="flex gap-3 justify-center">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center items-center">
           <Button 
             variant="outline" 
             color={albumSuccess === 'listento' ? 'green' : 'blue'}
             disabled={albumLoading !== null}
             onClick={() => handleAddAlbum('listento')}
+            className="w-full sm:w-auto"
           >
             {albumLoading === 'listento' ? 'Adding...' : 
             albumSuccess === 'listento' ? 'Album Added!' : 
@@ -335,10 +345,20 @@ const handleAddAlbum = async (target: 'listento' | 'listened') => {
           color={albumSuccess === 'listened' ? 'green' : 'indigo'}
           disabled={albumLoading !== null}
           onClick={() => handleAddAlbum('listened')}
+          className="w-full sm:w-auto"
         >
           {albumLoading === 'listened' ? 'Adding...' : 
           albumSuccess === 'listened' ? 'Album Added!' : 
           '+ Album to "Listened"'}
+        </Button>
+
+        <Button 
+          variant="outline" 
+          color="orange" 
+          onClick={() => setAlbumPlaylistOpen(true)}
+          className="w-full sm:w-auto"
+        >
+          + Album to Playlist
         </Button>
       </div>
     </div>                                                                      
