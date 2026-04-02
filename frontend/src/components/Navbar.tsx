@@ -4,7 +4,7 @@ import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from 'next-themes'
 import { Sun, Moon } from 'lucide-react'
-import logo from '../assets/harmoniq-logo.svg'
+import logo from '../assets/harmoniq-logo-flattened.svg'
 
 export default function Navbar() {
   const { user, login, logout } = useAuth();
