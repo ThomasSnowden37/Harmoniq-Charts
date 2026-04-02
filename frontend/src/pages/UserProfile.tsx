@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { MOCK_CURRENT_USER_ID } from '../lib/auth'
 import FriendsModal from '../features/friends/components/FriendsModal'
 import SettingsModal from '../features/settings/components/SettingsModal'
 import PlaylistSection from '../features/playlists/components/PlaylistSection'
 import DeleteUserModal from '../features/users/components/DeleteUserModal'
+import ManageFavoritesModal from '../features/songs/components/ManageFavoritesModal'
+import MutualFriendsModal from '../features/friends/components/MutualFriendsModal'
 import type { PrivacySetting } from '../features/settings/types'
 import type { Playlist } from '../features/playlists/types'
 import {
@@ -59,10 +61,17 @@ export default function UserProfile() {
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [playlists, setPlaylists] = useState<Playlist[]>([])
+  const [playlistCount, setPlaylistCount] = useState(0)
+  const [playlistsLoaded, setPlaylistsLoaded] = useState(false)
+  const [activeTab, setActiveTab] = useState<string>('reviews')
   const [friendCount, setFriendCount] = useState(0)
   const [likedSongs, setLikedSongs] = useState<{ id: string; title: string; genre: string; year_released: number; bpm: number }[]>([])
   const [userReviews, setUserReviews] = useState<{ id: string; content: string; created_at: string; song_id: string; songs: { id: string; title: string; genre: string; year_released: number } }[]>([])
   const [deleteUserModal, setDeleteUserModal] = useState(false)
+  const [mutualFriends, setMutualFriends] = useState<{ id: string; username: string }[]>([])
+  const [showMutualModal, setShowMutualModal] = useState(false)
+  const [favoriteSongs, setFavoriteSongs] = useState<{ id: string; song_id: string; position: number; songs: { id: string; title: string; bpm: number; genre: string; year_released: number; song_artists?: Array<{ artists?: { id: string; name: string } }> } }[]>([])
+  const [showFavoritesModal, setShowFavoritesModal] = useState(false)
 
   const isOwnProfile = userId === MOCK_CURRENT_USER_ID
 
@@ -70,18 +79,29 @@ export default function UserProfile() {
   const stats = {
     reviews: userReviews.length,
     friends: friendCount,
-    playlists: playlists.length,
+    playlists: playlistCount,
   }
 
   useEffect(() => {
     if (!userId) return
+    // Reset playlist state for new profile to avoid showing stale data
+    setPlaylists([])
+    setPlaylistsLoaded(false)
+
     fetchProfile()
-    fetchPlaylists()
+    fetchPlaylistCount()
     fetchFriendCount()
     fetchLikedSongs()
     fetchUserReviews()
+    fetchFavoriteSongs()
     if (!isOwnProfile) {
       fetchRelationship()
+      fetchMutualFriends()
+    }
+
+    // If the user navigated while the Playlists tab is active, fetch playlists for the new profile
+    if (activeTab === 'playlists') {
+      fetchPlaylists()
     }
   }, [userId])
 
@@ -136,10 +156,49 @@ export default function UserProfile() {
 
   async function fetchPlaylists() {
     try {
-      const res = await fetch(`/api/playlists/user/${userId}`)
-      if (res.ok) setPlaylists(await res.json())
+      const res = await fetch(`/api/playlists/user/${userId}`, {
+        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setPlaylists(data)
+        setPlaylistCount(data.length)
+        setPlaylistsLoaded(true)
+      }
     } catch (err) {
       console.error('Failed to fetch playlists:', err)
+    }
+  }
+
+  async function fetchPlaylistCount() {
+    try {
+      const res = await fetch(`/api/playlists/user/${userId}/count`)
+      if (res.ok) {
+        const data = await res.json()
+        setPlaylistCount(data.playlists || 0)
+      }
+    } catch (err) {
+      console.error('Failed to fetch playlist count:', err)
+    }
+  }
+
+  async function fetchMutualFriends() {
+    try {
+      const res = await fetch(`/api/friend-requests/mutual/${userId}`, {
+        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+      })
+      if (res.ok) setMutualFriends(await res.json())
+    } catch (err) {
+      console.error('Failed to fetch mutual friends:', err)
+    }
+  }
+
+  async function fetchFavoriteSongs() {
+    try {
+      const res = await fetch(`/api/favorite-songs/user/${userId}`)
+      if (res.ok) setFavoriteSongs(await res.json())
+    } catch (err) {
+      console.error('Failed to fetch favorite songs:', err)
     }
   }
 
@@ -336,6 +395,31 @@ export default function UserProfile() {
             </Box>
           </Flex>
 
+          {/* Compact mutual friends summary (click to view all) */}
+          {!isOwnProfile && mutualFriends.length > 0 && (
+            <Box className="text-center mt-3">
+              <Text size="1" color="gray">
+                Friends with {' '}
+                <button
+                  onClick={() => setShowMutualModal(true)}
+                  className="text-foreground hover:text-primary"
+                  style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}
+                >
+                  {(() => {
+                    
+                    const names = mutualFriends.slice(0, 3).map(m => m.username)
+                    const more = Math.max(0, mutualFriends.length - names.length)
+                    return (
+                      <>
+                        {names.join(', ')}{more > 0 ? ` +${more} more` : ''}
+                      </>
+                    )
+                  })()}
+                </button>
+              </Text>
+            </Box>
+          )}
+
           {error && (
             <Box mt="4" p="3" className="rounded-lg border border-destructive/30 bg-destructive/10">
               <Text className="text-destructive" size="2">{error}</Text>
@@ -361,6 +445,54 @@ export default function UserProfile() {
           </Flex>
         </Card>
 
+        {/* Top 5 Favorite Songs Section */}
+        {(favoriteSongs.length > 0 || isOwnProfile) && (
+          <Card size="3" mt="5">
+            <Flex justify="between" align="center" mb="3">
+              <Heading size="4">Top 5 Favorite</Heading>
+              {isOwnProfile && (
+                <Button size="2" variant="soft" onClick={() => setShowFavoritesModal(true)}>
+                  {favoriteSongs.length === 0 ? 'Add Favorites' : 'Edit'}
+                </Button>
+              )}
+            </Flex>
+            {favoriteSongs.length === 0 ? (
+              <Flex direction="column" align="center" py="4">
+                <Text color="gray" size="2">No favorite songs yet.</Text>
+              </Flex>
+            ) : (
+              <Flex direction="column" gap="2">
+                {favoriteSongs.map((fav, idx) => (
+                  <Link
+                    key={fav.id}
+                    to={`/songs/${fav.songs.id}`}
+                    className="flex items-center gap-3 p-3 rounded-lg transition-colors hover-bg-gray no-underline"
+                  >
+                    <Text size="4" weight="bold" color="gray">{idx + 1}</Text>
+                    <Box className="flex-1 min-w-0">
+                      <Text weight="medium" className="block">{fav.songs.title}</Text>
+                      <Text size="1" color="gray">
+                        {(() => {
+                          const artists = fav.songs?.song_artists?.map(sa => sa?.artists?.name).filter(Boolean)
+                          const artistStr = artists && artists.length ? artists.join(', ') : undefined
+                          return (
+                            <>
+                              {artistStr && <>{artistStr} · </>}
+                              {fav.songs.genre} · {fav.songs.year_released} · {fav.songs.bpm} BPM
+                            </>
+                          )
+                        })()}
+                      </Text>
+                    </Box>
+                  </Link>
+                ))}
+              </Flex>
+            )}
+          </Card>
+        )}
+
+        {/* mutual friends card removed - compact summary is shown in the header */}
+
         {/* Restricted message */}
         {isRestricted ? (
           <Card size="3" mt="5">
@@ -371,7 +503,14 @@ export default function UserProfile() {
           </Card>
         ) : (
           /* Reviews & Playlists Tabs */
-          <Tabs.Root defaultValue="reviews" className="mt-5">
+          <Tabs.Root
+            value={activeTab}
+            onValueChange={(val: string) => {
+              setActiveTab(val)
+              if (val === 'playlists' && !playlistsLoaded) fetchPlaylists()
+            }}
+            className="mt-5"
+          >
             <Tabs.List>
               <Tabs.Trigger value="reviews">Reviews</Tabs.Trigger>
               <Tabs.Trigger value="playlists">Playlists</Tabs.Trigger>
@@ -421,7 +560,9 @@ export default function UserProfile() {
               <PlaylistSection
                 playlists={playlists}
                 setPlaylists={setPlaylists}
+                loading={!playlistsLoaded}
                 isOwnProfile={isOwnProfile}
+                playlistCount={playlistCount}
               />
             </Tabs.Content>
 
@@ -486,6 +627,23 @@ export default function UserProfile() {
             window.location.href = '/'
           }}
         />
+
+      {isOwnProfile && (
+        <ManageFavoritesModal
+          isOpen={showFavoritesModal}
+          onClose={() => setShowFavoritesModal(false)}
+          onUpdated={fetchFavoriteSongs}
+        />
+      )}
+
+      {!isOwnProfile && (
+        <MutualFriendsModal
+          isOpen={showMutualModal}
+          onClose={() => setShowMutualModal(false)}
+          mutualFriends={mutualFriends}
+        />
+      )}
+
       <Footer />
     </Box>
   )

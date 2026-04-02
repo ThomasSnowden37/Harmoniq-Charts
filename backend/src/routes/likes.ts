@@ -69,6 +69,7 @@ router.post('/:songId', async (req, res) => {
     .single()
 
   if (error) return res.status(500).json({ error: error.message })
+  const { data: trend, error: trend_error } = await supabase.rpc('get_trending_songs');
   res.status(201).json(data)
 })
 
@@ -89,6 +90,7 @@ router.delete('/:songId', async (req, res) => {
     .eq('user_id', userId)
 
   if (error) return res.status(500).json({ error: error.message })
+  const { data: trend, error: trend_error } = await supabase.rpc('get_trending_songs');
   res.json({ message: 'Unliked successfully' })
 })
 
@@ -101,7 +103,7 @@ router.get('/user/:userId', async (req, res) => {
 
   const { data, error } = await supabase
     .from('likes')
-    .select('song_id, created_at, songs(id, title, genre, year_released, bpm)')
+    .select('song_id, created_at, songs(id, title, genre, year_released, bpm, song_artists(artists(id, name)))')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
 

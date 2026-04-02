@@ -3,13 +3,6 @@ import { supabase } from '../lib/supabase.js'
 import { generateKey } from 'crypto'
 
 /**
- * TODO:
- * Add Deleting, and Editing own songs
- * Add user_id to songs DB for when user creates a song
- * Check for more errors
- */
-
-/**
  * song.ts
  *
  * Description:
@@ -371,6 +364,7 @@ router.post('/:id/listened', async (req, res) => {
     if (error){
         return res.status(500).json({ error: 'Failed to add song to listened'})
     }
+    const { data: trend, error: trend_error } = await supabase.rpc('get_trending_songs');
     return res.status(201).json(data)
 })
 
@@ -405,6 +399,7 @@ router.delete('/:id/listened', async (req, res) => {
     if (error) {
         return res.status(500).json({ error: 'Failed to remove listened' })
     }
+    const { data: trend, error: trend_error } = await supabase.rpc('get_trending_songs');
     res.json({ message: 'Successfully deleted' })
 })
 

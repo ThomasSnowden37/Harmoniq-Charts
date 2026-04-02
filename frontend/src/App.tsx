@@ -9,6 +9,7 @@ import UserSearchPage from './pages/UserSearchPage'
 import PlaylistPage from './pages/PlaylistPage'
 import ListenToPage  from './pages/ListenToPage'
 import RecommendResult from './pages/RecommendResult'
+import TrendingPage  from './pages/TrendingPage'
 
 // Define routes to various pages here
 function App() {
@@ -25,6 +26,7 @@ function App() {
         <Route path="/recommend/:id" element={<RecommendResult />} />
         <Route path="/playlists/:playlistId" element={<PlaylistPage />} />
         <Route path="/songs/listento" element={<ListenToPage />} />
+        <Route path="/trending" element={<TrendingPage />} />
       </Routes>
     </BrowserRouter>
   )
