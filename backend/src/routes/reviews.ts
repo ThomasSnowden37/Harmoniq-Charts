@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabase.js'
 
 const router = Router()
 
-const MAX_REVIEW_LENGTH = 500
+const MAX_REVIEW_LENGTH = 100
 
 function getUserId(req: any): string | null {
   return req.headers['x-user-id'] as string || null

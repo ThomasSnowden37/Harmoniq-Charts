@@ -51,7 +51,7 @@ export default function SongPage() {
     const [albumSuccess, setAlbumSuccess] = useState<'listento' | 'listened' | null>(null);
     const [albumPlaylistOpen, setAlbumPlaylistOpen] = useState(false)
 
-    const MAX_CHARS = 500
+    const MAX_CHARS = 100
     const userReview = reviews.find(r => r.user_id === user?.id)
 
 
@@ -378,7 +378,6 @@ const handleAddAlbum = async (target: 'listento' | 'listened') => {
           onChange={e => { setReviewText(e.target.value); setReviewError(null) }}
           placeholder="What did you think of this song?"
           rows={4}
-          maxLength={MAX_CHARS}
           className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary resize-none"
         />
         <div className="flex items-center justify-between mt-2">
@@ -391,6 +390,10 @@ const handleAddAlbum = async (target: 'listento' | 'listened') => {
               size="2"
               disabled={submittingReview || !reviewText.trim()}
               onClick={async () => {
+                if (reviewText.trim().length > MAX_CHARS) {
+                  setReviewError(`Review cannot exceed ${MAX_CHARS} characters`)
+                  return
+                }
                 setSubmittingReview(true)
                 setReviewError(null)
                 try {
