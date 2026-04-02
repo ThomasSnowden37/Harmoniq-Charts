@@ -21,6 +21,7 @@ import {
   Tabs,
   Text,
 } from '@radix-ui/themes'
+import { Share2, Check } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 
@@ -72,10 +73,10 @@ export default function UserProfile() {
   const [showMutualModal, setShowMutualModal] = useState(false)
   const [favoriteSongs, setFavoriteSongs] = useState<{ id: string; song_id: string; position: number; songs: { id: string; title: string; bpm: number; genre: string; year_released: number; song_artists?: Array<{ artists?: { id: string; name: string } }> } }[]>([])
   const [showFavoritesModal, setShowFavoritesModal] = useState(false)
+  const [copied, setCopied] = useState(false);
 
   const isOwnProfile = userId === MOCK_CURRENT_USER_ID
 
-  // TODO: Replace with real data from API
   const stats = {
     reviews: userReviews.length,
     friends: friendCount,
@@ -295,6 +296,16 @@ export default function UserProfile() {
   }
 
   function renderActionButtons() {
+    const shareBtn = (
+      <Button 
+        variant="soft" 
+        color={copied ? "green" : "gray"} 
+        onClick={handleCopyLink}
+      >
+        {copied ? <Check size={16} /> : <Share2 size={16} />}
+        {copied ? "Link Copied!" : "Share Profile"}
+      </Button>
+    );
     if (isOwnProfile) {
       return (
         <Flex gap="2">
@@ -307,37 +318,57 @@ export default function UserProfile() {
           <Button variant="outline" onClick={() => window.location.href = '/songs/listento'}>
             Listen To
           </Button>
+          {shareBtn}
         </Flex>
       )
     }
 
-    switch (relationship.status) {
-      case 'none':
-        return (
-          <Button onClick={sendFriendRequest} disabled={actionLoading}>
-            {actionLoading ? 'Sending...' : 'Add Friend'}
-          </Button>
-        )
-      case 'outgoing_pending':
-        return (
-          <Button variant="soft" color="orange" onClick={cancelRequest} disabled={actionLoading}>
-            {actionLoading ? 'Cancelling...' : 'Pending - Cancel Request'}
-          </Button>
-        )
-      case 'incoming_pending':
-        return (
-          <Button color="green" onClick={acceptRequest} disabled={actionLoading}>
-            {actionLoading ? 'Accepting...' : 'Accept Friend Request'}
-          </Button>
-        )
-      case 'friends':
-        return (
-          <Button color="red" variant="soft" onClick={unfriend} disabled={actionLoading}>
-            {actionLoading ? 'Unfollowing...' : 'Unfollow'}
-          </Button>
-        )
-    }
+    return (
+      <Flex gap="2" wrap="wrap">
+        {(() => {
+          switch (relationship.status) {
+            case 'none':
+              return (
+                <Button onClick={sendFriendRequest} disabled={actionLoading}>
+                  {actionLoading ? 'Sending...' : 'Add Friend'}
+                </Button>
+              )
+            case 'outgoing_pending':
+              return (
+                <Button variant="soft" color="orange" onClick={cancelRequest} disabled={actionLoading}>
+                  {actionLoading ? 'Cancelling...' : 'Pending - Cancel Request'}
+                </Button>
+              )
+            case 'incoming_pending':
+              return (
+                <Button color="green" onClick={acceptRequest} disabled={actionLoading}>
+                  {actionLoading ? 'Accepting...' : 'Accept Friend Request'}
+                </Button>
+              )
+            case 'friends':
+              return (
+                <Button color="red" variant="soft" onClick={unfriend} disabled={actionLoading}>
+                  {actionLoading ? 'Unfollowing...' : 'Unfollow'}
+                </Button>
+              )
+            default:
+              return null;
+          }
+        })()}
+      </Flex>
+    )
   }
+
+  const handleCopyLink = () => {
+    // Grab the current window URL
+    navigator.clipboard.writeText(window.location.href);
+    
+    // Provide visual feedback
+    setCopied(true);
+    
+    // Reset after 3 seconds
+    setTimeout(() => setCopied(false), 3000);
+  };
 
   function handlePrivacyChange(privacy: PrivacySetting) {
     if (profileUser) {
