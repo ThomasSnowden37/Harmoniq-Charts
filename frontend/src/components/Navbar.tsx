@@ -30,6 +30,11 @@ export default function Navbar() {
             <Text size="2" className="text-foreground tracking-tight">Song Lookup</Text>
           </div>
         </Link>
+        <Link to="/feed" className="no-underline">
+          <div className="border-4 border-solid border-border px-4 rounded-md">
+            <Text size="2" className="text-foreground tracking-tight">Feed</Text>
+          </div>
+        </Link>
         <Link to="/songs/add" className="no-underline">
           <div className="border-4 border-solid border-border px-4 rounded-md">
             <Text size="2" className="text-foreground tracking-tight">Add Song</Text>

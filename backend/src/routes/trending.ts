@@ -4,7 +4,7 @@ import { generateKey } from 'crypto'
 import { create } from 'domain'
 
 /**
- * song.ts
+ * trending.ts
  *
  * Description:
  * Defines the backend routes for accessing trending song information
