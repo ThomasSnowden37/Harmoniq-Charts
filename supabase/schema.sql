@@ -31,6 +31,7 @@ CREATE TABLE songs (
     album_id UUID REFERENCES albums(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE SET NULL,
+    trending_score NUMERIC DEFAULT 0,
 );
 
 -- MANY TO MANY TABLES

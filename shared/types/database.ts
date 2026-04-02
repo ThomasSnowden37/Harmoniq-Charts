@@ -70,6 +70,7 @@ export interface Database {
           album_id: string | null
           created_at: string
           user_id: string | null
+          trending_score: number | null
         }
         Insert: {
           id?: string
@@ -80,6 +81,7 @@ export interface Database {
           album_id?: string | null
           created_at?: string
           user_id: string | null
+          trending_score: number | null
         }
         Update: {
           id?: string
@@ -90,6 +92,7 @@ export interface Database {
           album_id?: string | null
           created_at?: string
           user_id: string | null
+          trending_score: number | null
         }
       }
       song_artists: {

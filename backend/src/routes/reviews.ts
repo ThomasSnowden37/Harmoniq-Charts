@@ -83,6 +83,7 @@ router.post('/:songId', async (req, res) => {
     .single()
 
   if (error) return res.status(500).json({ error: error.message })
+  const { data: trend, error: trend_error } = await supabase.rpc('get_trending_songs');
   res.status(201).json(data)
 })
 
@@ -107,6 +108,7 @@ router.delete('/:reviewId', async (req, res) => {
 
   const { error } = await supabase.from('reviews').delete().eq('id', reviewId)
   if (error) return res.status(500).json({ error: error.message })
+  const { data: trend, error: trend_error } = await supabase.rpc('get_trending_songs');
   res.json({ message: 'Review deleted' })
 })
 

@@ -4,6 +4,7 @@ import { Button } from '@radix-ui/themes'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
+import RatingSong from '../features/songs/components/RatingSong'
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -143,6 +144,8 @@ export default function SongPage() {
       {/*  Total listeners */}
       <p>Listeners: {listenedCount}</p>
       <p>Likes: {likeCount}</p>
+
+      <RatingSong id = {song.id} />
 
       {/* Delete button only if user created song*/}
       {user && user.id == song.user_id && ( //User must be logged in and created for it to show up
