@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 export default function SearchPage() {
   const [query, setQuery] = useState('');
   const [column, setColumn] = useState<
-  'title' | 'artist' | 'album' | 'genre' | 'bpm' | 'songwriter' | 'singles_by_artist'
+  'title' | 'artist' | 'album' | 'genre' | 'bpm' | 'songwriter' | 'singles_by_artist' | 'rating'
   >('title');
   const [songs, setSongs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,24 +30,48 @@ export default function SearchPage() {
 
   try {
     // select the songs
-    let queryBuilder = supabase
-      .from('songs')
-      .select(`
-        *,
-        albums (*),
-        song_artists!inner (
-          artists!inner (*)
-        ),
-        likes (*),
-        listened (*),
-        listento (*)
-      `)
-      .order('title', { ascending: true });
+    let queryBuilder: any;
+
+      if (column === 'rating') {
+        queryBuilder = supabase
+          .from('songs')
+          .select(`
+            *,
+            albums (*),
+            song_artists!inner (
+              artists!inner (*)
+            ),
+            likes (*),
+            listened (*),
+            listento (*),
+            ratings!inner (*)
+          `)
+          .order('title', { ascending: true });
+      } else {
+        queryBuilder = supabase
+          .from('songs')
+          .select(`
+            *,
+            albums (*),
+            song_artists!inner (
+              artists!inner (*)
+            ),
+            likes (*),
+            listened (*),
+            listento (*),
+            ratings (*)
+          `)
+          .order('title', { ascending: true });
+      }
 
     if (column === 'bpm') {
       const bpmQuery = parseInt(query.replace(/\D/g, ''), 10);
       if (!isNaN(bpmQuery)) queryBuilder = queryBuilder.eq('bpm', bpmQuery);
     } 
+    else if (column === 'rating') {
+        const ratingQuery = parseFloat(query);
+        if (!isNaN(ratingQuery)) queryBuilder = queryBuilder.eq('ratings.rating', ratingQuery);
+    }
     else if (column === 'album') {
       queryBuilder = queryBuilder.ilike('albums.name', `%${query}%`);
     } 
@@ -73,25 +97,24 @@ export default function SearchPage() {
 
       // filters that are user-specific
       if (user) {
-        if (liked) {
-          filtered = filtered.filter(song =>
-            song.likes?.some((l: any) => l.user_id === user.id) ?? false
-          );
+          if (liked) {
+            filtered = filtered.filter((song: any) =>
+              song.likes?.some((l: any) => l.user_id === user.id) ?? false
+            );
+          }
+      
+          if (listened) {
+            filtered = filtered.filter((song: any) =>
+              song.listened?.some((l: any) => l.user_id === user.id) ?? false
+            );
+          }
+      
+          if (listenedTo) {
+            filtered = filtered.filter((song: any) =>
+              song.listento?.some((l: any) => l.user_id === user.id) ?? false
+            );
+          }
         }
-    
-        if (listened) {
-          filtered = filtered.filter(song =>
-            song.listened?.some((l: any) => l.user_id === user.id) ?? false
-          );
-        }
-    
-        if (listenedTo) {
-          filtered = filtered.filter(song =>
-            song.listento?.some((l: any) => l.user_id === user.id) ?? false
-          );
-        }
-    
-      }
 
       setSongs(filtered);
 
@@ -122,6 +145,44 @@ export default function SearchPage() {
 
       return isActive ? <strong>{displayValue}</strong> : displayValue;
     };
+
+  // Helper to calculate average rating and draw stars
+  const renderStars = (ratings: any[]) => {
+    if (!ratings || ratings.length === 0) {
+      return <span className="text-muted-foreground text-sm">Unrated</span>;
+    }
+    
+    // Calculate the average rating
+    const avg = ratings.reduce((acc, curr) => acc + curr.rating, 0) / ratings.length;
+    
+    return (
+      <div className="flex items-center" title={`${avg.toFixed(1)} out of 5`}>
+        <div className="flex tracking-widest">
+          {[1, 2, 3, 4, 5].map((star) => {
+            // Calculate how much of this specific star should be filled (from 0 to 1)
+            const fill = Math.max(0, Math.min(1, avg - (star - 1)));
+            
+            return (
+              <span
+                key={star}
+                className="relative text-lg text-muted-foreground/30"
+              >
+                ★
+                <span
+                  className="absolute left-0 top-0 overflow-hidden text-yellow-400"
+                  style={{ width: `${fill * 100}%` }}
+                >
+                  ★
+                </span>
+              </span>
+            );
+          })}
+        </div>
+        {/* Optional: Show the exact number next to the stars */}
+        <span className="text-xs text-muted-foreground ml-2">({avg.toFixed(1)})</span>
+      </div>
+    );
+  };
 
     // update for checking
     useEffect(() => {
@@ -171,6 +232,7 @@ export default function SearchPage() {
               <option value="genre">Genre</option>
               <option value="bpm">BPM</option>
               <option value="songwriter">Songwriters</option>
+              <option value="rating">Star Rating</option>
             </select>
 
             {/* Search button */}
@@ -245,10 +307,12 @@ export default function SearchPage() {
                               <div className="flex-1 min-w-[120px]">Album: {renderBold(song.albums?.name ?? "Single", "album")} </div>
                           </div>      
 
-                          <div className="flex flex-wrap gap-4">
+                          <div className="flex flex-wrap gap-4 items-center">
                               <div className="flex-1">Genre: {renderBold(song.genre, "genre")} </div>
                               <div className="flex-1">Bpm: {renderBold(song.bpm, "bpm")}</div>
-                              <div className="flex-1"></div>
+                              <div className="flex-1 min-w-[150px] flex items-center gap-2">
+                                Rating: {renderStars(song.ratings)}
+                              </div>
                           </div>
                         </div>
                       </div>
