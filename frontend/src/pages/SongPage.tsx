@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { Button } from '@radix-ui/themes'
+import { useParams, Link } from 'react-router-dom'
+import { Button, Avatar } from '@radix-ui/themes'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
@@ -343,9 +343,19 @@ export default function SongPage() {
         {reviews.map(review => (
           <div key={review.id} className="p-4 rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between mb-2">
-              <a href={`/user/${review.user_id}`} className="text-sm font-medium text-foreground hover:text-primary no-underline">
-                {review.users.username}
-              </a>
+              <div className="flex items-center gap-3">
+                <Link to={`/user/${review.user_id}`}>
+                  <Avatar 
+                    size="2" 
+                    radius="full" 
+                    fallback={review.users?.username?.slice(0, 2).toUpperCase() || '??'} 
+                    className="hover:opacity-80 transition-opacity"
+                  />
+                </Link>
+                <Link to={`/user/${review.user_id}`} className="text-sm font-medium text-foreground hover:text-primary no-underline">
+                  {review.users.username}
+                </Link>
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">
                   {new Date(review.created_at).toLocaleDateString()}
