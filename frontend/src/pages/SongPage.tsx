@@ -30,6 +30,7 @@ interface Song {
     year_released: number
     user_id: string
     spotify_id?: string | null
+    album_id?: string
 }
 
 export default function SongPage() {
@@ -52,6 +53,9 @@ export default function SongPage() {
     const [reviewText, setReviewText] = useState('')
     const [reviewError, setReviewError] = useState<string | null>(null)
     const [submittingReview, setSubmittingReview] = useState(false)
+    const [albumLoading, setAlbumLoading] = useState<'listento' | 'listened' | null>(null);
+    const [albumSuccess, setAlbumSuccess] = useState<'listento' | 'listened' | null>(null);
+    const [albumPlaylistOpen, setAlbumPlaylistOpen] = useState(false)
 
     const MAX_CHARS = 500
     const userReview = reviews.find(r => r.user_id === user?.id)
@@ -132,6 +136,37 @@ export default function SongPage() {
   }
   fetchUserSongData()
 }, [user, id])
+
+const handleAddAlbum = async (target: 'listento' | 'listened') => {
+        if (!user || !song?.album_id) return;
+        
+        setAlbumLoading(target);
+        setAlbumSuccess(null);
+
+        try {
+            const res = await fetch(`http://localhost:3001/api/songs/album/${song.album_id}/bulk-add`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': user.id
+                },
+                body: JSON.stringify({ targetTable: target })
+            });
+
+            if (res.ok) {
+                if (target === 'listento') setListento(true);
+                if (target === 'listened') setListened(true);
+                
+                setAlbumSuccess(target);
+                // Clear success message after 3 seconds
+                setTimeout(() => setAlbumSuccess(null), 3000);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setAlbumLoading(null);
+        }
+  };
 
   if (loading) return <div className="min-h-screen flex flex-col"><Navbar /><main className="p-6 text-center">Loading...</main><Footer /></div>
   if (error) return <div className="min-h-screen flex flex-col bg-background"><Navbar /><main className="text-destructive p-6 text-center">{error}</main><Footer /></div>
@@ -259,6 +294,13 @@ export default function SongPage() {
           setSong(updated)
         }}
       />
+      {song.album_id && (
+                <AddToPlaylistModal
+                    isOpen={albumPlaylistOpen}
+                    onClose={() => setAlbumPlaylistOpen(false)}
+                    albumId={song.album_id} 
+                />
+      )}
       </>
       )}
     {user && ( //User must be logged in for it to show up
@@ -340,6 +382,46 @@ export default function SongPage() {
   </Button>
       </>
   )}
+  {/* Album Actions Section */}
+  {user && song.album_id && (
+    <div className="mb-12 p-6 rounded-2xl border border-dashed border-border bg-card/50 max-w-md w-full">
+      <h3 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wider">Full Album Actions</h3>
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center items-center">
+          <Button 
+            variant="outline" 
+            color={albumSuccess === 'listento' ? 'green' : 'blue'}
+            disabled={albumLoading !== null}
+            onClick={() => handleAddAlbum('listento')}
+            className="w-full sm:w-auto"
+          >
+            {albumLoading === 'listento' ? 'Adding...' : 
+            albumSuccess === 'listento' ? 'Album Added!' : 
+            '+ Album to "Listen To"'}
+          </Button>
+                            
+          <Button 
+          variant="outline" 
+          color={albumSuccess === 'listened' ? 'green' : 'indigo'}
+          disabled={albumLoading !== null}
+          onClick={() => handleAddAlbum('listened')}
+          className="w-full sm:w-auto"
+        >
+          {albumLoading === 'listened' ? 'Adding...' : 
+          albumSuccess === 'listened' ? 'Album Added!' : 
+          '+ Album to "Listened"'}
+        </Button>
+
+        <Button 
+          variant="outline" 
+          color="orange" 
+          onClick={() => setAlbumPlaylistOpen(true)}
+          className="w-full sm:w-auto"
+        >
+          + Album to Playlist
+        </Button>
+      </div>
+    </div>                                                                      
+  )}                                  
   </main>
 
   {/* Reviews Section */}

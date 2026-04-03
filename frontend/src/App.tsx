@@ -10,6 +10,8 @@ import PlaylistPage from './pages/PlaylistPage'
 import ListenToPage  from './pages/ListenToPage'
 import RecommendResult from './pages/RecommendResult'
 import TrendingPage  from './pages/TrendingPage'
+import FeedPage  from './pages/FeedPage'
+import AllFeedPage  from './pages/AllFeedPage'
 
 // Define routes to various pages here
 function App() {
@@ -27,6 +29,8 @@ function App() {
         <Route path="/playlists/:playlistId" element={<PlaylistPage />} />
         <Route path="/songs/listento" element={<ListenToPage />} />
         <Route path="/trending" element={<TrendingPage />} />
+        <Route path="/feed" element={<FeedPage />} />
+        <Route path="/feed/all" element={<AllFeedPage />} />
       </Routes>
     </BrowserRouter>
   )

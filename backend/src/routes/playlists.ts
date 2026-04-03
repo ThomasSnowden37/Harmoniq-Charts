@@ -579,4 +579,79 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
   res.json({ message: 'Comment deleted' })
 })
 
+/**
+ * Bulk add all songs from an album to a playlist
+ */
+router.post('/:playlistId/album/:albumId', async (req, res) => {
+    const { playlistId, albumId } = req.params;
+    const userId = req.headers['x-user-id'] as string;
+
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    try {
+        const { data: songs, error: fetchError } = await supabase
+            .from('songs')
+            .select('id')
+            .eq('album_id', albumId);
+
+        if (fetchError) throw fetchError;
+        if (!songs || songs.length === 0) {
+            return res.status(404).json({ error: 'No songs found for this album' });
+        }
+
+        const insertData = songs.map(song => ({
+            playlist_id: playlistId,
+            song_id: song.id,
+        }));
+
+        const { error: upsertError } = await supabase
+            .from('playlist_songs')
+            .upsert(insertData, { onConflict: 'playlist_id, song_id' });
+
+        if (upsertError) throw upsertError;
+
+        res.json({ success: true, message: `Added ${songs.length} songs to playlist.` });
+    } catch (err: any) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * Bulk remove all songs from an album in a playlist
+ */
+router.delete('/:playlistId/album/:albumId', async (req, res) => {
+    const { playlistId, albumId } = req.params;
+    const userId = req.headers['x-user-id'] as string;
+
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    try {
+        const { data: songs, error: fetchError } = await supabase
+            .from('songs')
+            .select('id')
+            .eq('album_id', albumId);
+
+        if (fetchError) throw fetchError;
+        if (!songs || songs.length === 0) {
+            return res.status(404).json({ error: 'No songs found for this album' });
+        }
+
+        const songIds = songs.map(s => s.id);
+
+        const { error: deleteError } = await supabase
+            .from('playlist_songs')
+            .delete()
+            .eq('playlist_id', playlistId)
+            .in('song_id', songIds);
+
+        if (deleteError) throw deleteError;
+
+        res.json({ success: true, message: `Removed album from playlist.` });
+    } catch (err: any) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router

@@ -557,5 +557,51 @@ router.delete('/:id/listento', async (req, res) => {
     res.json({ message: 'Successfully deleted' })
 })
 
+/**
+ * Bulk add songs from an album to listened or listen to
+ */
+router.post('/album/:albumId/bulk-add', async (req, res) => {
+    const { albumId } = req.params;
+    const { targetTable } = req.body; 
+    const userId = req.headers['x-user-id'] as string;
+
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!['listento', 'listened'].includes(targetTable)) {
+        return res.status(400).json({ error: 'Invalid target table' });
+    }
+
+    try {
+        const { data: songs, error: songError } = await supabase
+            .from('songs')
+            .select('id')
+            .eq('album_id', albumId);
+
+        if (songError) throw songError;
+        if (!songs || songs.length === 0) {
+            return res.status(404).json({ error: 'No songs found for this album' });
+        }
+
+        const insertData = songs.map(song => ({
+            user_id: userId,
+            song_id: song.id
+        }));
+
+        const { data, error: insertError } = await supabase
+            .from(targetTable)
+            .upsert(insertData, { onConflict: 'user_id, song_id' })
+            .select();
+
+        if (insertError) throw insertError;
+
+        return res.status(201).json({ 
+            message: `Successfully processed ${insertData.length} songs`,
+            count: data?.length 
+        });
+    } catch (err: any) {
+        console.error("Bulk Add Error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 
 export default router

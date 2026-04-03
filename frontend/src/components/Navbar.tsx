@@ -4,7 +4,7 @@ import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from 'next-themes'
 import { Sun, Moon } from 'lucide-react'
-import logo from '../assets/harmoniq-logo.svg'
+import logo from '../assets/harmoniq-logo-flattened.svg'
 
 export default function Navbar() {
   const { user, login, logout } = useAuth();
@@ -28,6 +28,11 @@ export default function Navbar() {
         <Link to="/search" className="no-underline">
           <div className="border-4 border-solid border-border px-4 rounded-md">
             <Text size="2" className="text-foreground tracking-tight">Song Lookup</Text>
+          </div>
+        </Link>
+        <Link to="/feed" className="no-underline">
+          <div className="border-4 border-solid border-border px-4 rounded-md">
+            <Text size="2" className="text-foreground tracking-tight">Feed</Text>
           </div>
         </Link>
         <Link to="/songs/add" className="no-underline">
