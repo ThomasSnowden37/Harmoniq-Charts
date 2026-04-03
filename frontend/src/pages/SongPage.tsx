@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { Button } from '@radix-ui/themes'
+import { useParams, Link } from 'react-router-dom'
+import { Button, Avatar } from '@radix-ui/themes'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
 import { LinkSpotifyTrackModal } from '../features/spotify/components/LinkSpotifyTrackModal'
 import { useSpotify } from '../features/spotify/context/SpotifyContext'
+import RatingSong from '../features/songs/components/RatingSong'
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { SPOTIFY_OPEN_TRACK_URL } from '../lib/spotify'
-
-
 
 /**
  * SongPage.tsx
@@ -47,6 +46,15 @@ export default function SongPage() {
     const [listenedCount, setListenedCount] = useState(0)
     const [listened, setListened] = useState(false)
     const [listento, setListento] = useState(false)
+    const [liked, setLiked] = useState(false)
+    const [likeCount, setLikeCount] = useState(0)
+    const [reviews, setReviews] = useState<{ id: string; content: string; created_at: string; user_id: string; users: { username: string } }[]>([])
+    const [reviewText, setReviewText] = useState('')
+    const [reviewError, setReviewError] = useState<string | null>(null)
+    const [submittingReview, setSubmittingReview] = useState(false)
+
+    const MAX_CHARS = 500
+    const userReview = reviews.find(r => r.user_id === user?.id)
 
 
     useEffect(() => {
@@ -70,6 +78,13 @@ export default function SongPage() {
           )
           const countData = await countRes.json()
           if (countRes.ok) setListenedCount(countData.total)
+
+          const likeRes = await fetch(`/api/likes/${id}/status`)
+          const likeData = await likeRes.json()
+          if (likeRes.ok) setLikeCount(likeData.count)
+
+          const reviewsRes = await fetch(`/api/reviews/song/${id}`)
+          if (reviewsRes.ok) setReviews(await reviewsRes.json())
 
         } catch (err) {
           setError('Failed to fetch song')
@@ -102,6 +117,15 @@ export default function SongPage() {
         )
         const listentoData = await toLis.json()
         if (toLis.ok) setListento(listentoData.listento)
+
+        const likeStatusRes = await fetch(`/api/likes/${id}/status`, {
+          headers: { 'x-user-id': userId }
+        })
+        const likeStatusData = await likeStatusRes.json()
+        if (likeStatusRes.ok) {
+          setLiked(likeStatusData.liked)
+          setLikeCount(likeStatusData.count)
+        }
     } catch (err) {
       console.error(err)
     }
@@ -124,7 +148,10 @@ export default function SongPage() {
       <p>Year: {song.year_released}</p>
 
       {/*  Total listeners */}
-      <p> Listeners: {listenedCount}</p>
+      <p>Listeners: {listenedCount}</p>
+      <p>Likes: {likeCount}</p>
+
+      <RatingSong id = {song.id} />
 
       {/* Spotify "Listen on Spotify" button */}
       {song.spotify_id && (
@@ -288,9 +315,133 @@ export default function SongPage() {
 >
     {listento ? 'Listen To' : 'Mark as Listen To'}
   </Button>
+  <Button
+    size="2"
+    variant={liked ? 'solid' : 'soft'}
+    color={liked ? 'red' : 'gray'}
+    onClick={async () => {
+      try {
+        const method = liked ? 'DELETE' : 'POST'
+        const res = await fetch(`/api/likes/${id}`, {
+          method,
+          headers: { 'x-user-id': user.id }
+        })
+        if (res.ok) {
+          setLiked(!liked)
+          setLikeCount(c => liked ? c - 1 : c + 1)
+        }
+      } catch (err: any) {
+        console.error(err.message)
+      }
+    }}
+    className="mt-4"
+  >
+    {liked ? '♥ Liked' : '♡ Like'}
+  </Button>
       </>
   )}
   </main>
+
+  {/* Reviews Section */}
+  <section className="max-w-2xl mx-auto w-full px-6 pb-16">
+    <h2 className="text-xl font-bold mb-6">Reviews</h2>
+
+    {/* Review form — only shown if logged in and hasn't reviewed yet */}
+    {user && !userReview && (
+      <div className="mb-8 p-4 rounded-xl border border-border bg-card">
+        <h3 className="text-sm font-medium mb-2">Leave a Review</h3>
+        <textarea
+          value={reviewText}
+          onChange={e => { setReviewText(e.target.value); setReviewError(null) }}
+          placeholder="What did you think of this song?"
+          rows={4}
+          maxLength={MAX_CHARS}
+          className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary resize-none"
+        />
+        <div className="flex items-center justify-between mt-2">
+          <span className={`text-xs ${reviewText.length >= MAX_CHARS ? 'text-destructive' : 'text-muted-foreground'}`}>
+            {reviewText.length}/{MAX_CHARS}
+          </span>
+          <div className="flex items-center gap-3">
+            {reviewError && <span className="text-xs text-destructive">{reviewError}</span>}
+            <Button
+              size="2"
+              disabled={submittingReview || !reviewText.trim()}
+              onClick={async () => {
+                setSubmittingReview(true)
+                setReviewError(null)
+                try {
+                  const res = await fetch(`/api/reviews/${id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+                    body: JSON.stringify({ content: reviewText.trim() }),
+                  })
+                  const data = await res.json()
+                  if (!res.ok) { setReviewError(data.error); return }
+                  setReviews(prev => [data, ...prev])
+                  setReviewText('')
+                } catch {
+                  setReviewError('Failed to submit review')
+                } finally {
+                  setSubmittingReview(false)
+                }
+              }}
+            >
+              {submittingReview ? 'Submitting...' : 'Submit'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Review list */}
+    {reviews.length === 0 ? (
+      <p className="text-muted-foreground text-sm text-center py-8">No reviews yet. Be the first!</p>
+    ) : (
+      <div className="space-y-4">
+        {reviews.map(review => (
+          <div key={review.id} className="p-4 rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <Link to={`/user/${review.user_id}`}>
+                  <Avatar 
+                    size="2" 
+                    radius="full" 
+                    fallback={review.users?.username?.slice(0, 2).toUpperCase() || '??'} 
+                    className="hover:opacity-80 transition-opacity"
+                  />
+                </Link>
+                <Link to={`/user/${review.user_id}`} className="text-sm font-medium text-foreground hover:text-primary no-underline">
+                  {review.users.username}
+                </Link>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {new Date(review.created_at).toLocaleDateString()}
+                </span>
+                {user?.id === review.user_id && (
+                  <button
+                    className="text-xs text-destructive hover:underline cursor-pointer"
+                    onClick={async () => {
+                      const res = await fetch(`/api/reviews/${review.id}`, {
+                        method: 'DELETE',
+                        headers: { 'x-user-id': user.id },
+                      })
+                      if (res.ok) setReviews(prev => prev.filter(r => r.id !== review.id))
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-sm text-foreground whitespace-pre-wrap">{review.content}</p>
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+
   <Footer />
     </div>
   )

@@ -5,6 +5,8 @@ export interface Playlist {
   is_pinned: boolean
   created_at: string
   song_count?: number
+  likes_count?: number
+  liked?: boolean
 }
 
 export interface PlaylistWithSongs extends Playlist {
@@ -19,6 +21,9 @@ export interface PlaylistSong {
   genre: string
   year_released: number
   added_at: string
+  position: number
+  // optional nested artist info from the backend: song_artists -> artists
+  song_artists?: Array<{ artists?: { id: string; name: string } }>
 }
 
 export interface PlaylistCheckItem {

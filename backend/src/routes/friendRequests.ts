@@ -216,4 +216,51 @@ router.delete('/unfriend/:otherUserId', async (req, res) => {
   res.json({ success: true })
 })
 
+// Get mutual friends between current user and another user
+router.get('/mutual/:otherUserId', async (req, res) => {
+  const userId = getUserId(req)
+  const { otherUserId } = req.params
+  if (!userId) return res.status(401).json({ error: 'Missing x-user-id header' })
+
+  // Get current user's friends
+  const { data: myFriends, error: myErr } = await supabase
+    .from('friend_requests')
+    .select('requester_id, addressee_id')
+    .eq('status', 'accepted')
+    .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
+
+  if (myErr) return res.status(500).json({ error: myErr.message })
+
+  const myFriendIds = new Set(
+    myFriends?.map(r => r.requester_id === userId ? r.addressee_id : r.requester_id) || []
+  )
+
+  // Get other user's friends
+  const { data: theirFriends, error: theirErr } = await supabase
+    .from('friend_requests')
+    .select('requester_id, addressee_id')
+    .eq('status', 'accepted')
+    .or(`requester_id.eq.${otherUserId},addressee_id.eq.${otherUserId}`)
+
+  if (theirErr) return res.status(500).json({ error: theirErr.message })
+
+  const theirFriendIds = new Set(
+    theirFriends?.map(r => r.requester_id === otherUserId ? r.addressee_id : r.requester_id) || []
+  )
+
+  // Intersection
+  const mutualIds = [...myFriendIds].filter(id => theirFriendIds.has(id))
+
+  if (mutualIds.length === 0) return res.json([])
+
+  // Fetch user details for mutual friends
+  const { data: mutualUsers, error: usersErr } = await supabase
+    .from('users')
+    .select('id, username')
+    .in('id', mutualIds)
+
+  if (usersErr) return res.status(500).json({ error: usersErr.message })
+  res.json(mutualUsers || [])
+})
+
 export default router

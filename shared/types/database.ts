@@ -71,6 +71,7 @@ export interface Database {
           created_at: string
           user_id: string | null
           spotify_id: string | null
+          trending_score: number | null
         }
         Insert: {
           id?: string
@@ -82,6 +83,7 @@ export interface Database {
           created_at?: string
           user_id: string | null
           spotify_id?: string | null
+          trending_score: number | null
         }
         Update: {
           id?: string
@@ -93,6 +95,7 @@ export interface Database {
           created_at?: string
           user_id: string | null
           spotify_id?: string | null
+          trending_score: number | null
         }
       }
       song_artists: {
@@ -266,18 +269,21 @@ export interface Database {
           id: string
           playlist_id: string
           song_id: string
+          position: number
           added_at: string
         }
         Insert: {
           id?: string
           playlist_id: string
           song_id: string
+          position?: number
           added_at?: string
         }
         Update: {
           id?: string
           playlist_id?: string
           song_id?: string
+          position?: number
           added_at?: string
         }
       }
@@ -360,6 +366,27 @@ export interface Database {
           spotify_profile_url?: string | null
           created_at?: string
           updated_at?: string
+      favorite_songs: {
+        Row: {
+          id: string
+          user_id: string
+          song_id: string
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          song_id: string
+          position: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          song_id?: string
+          position?: number
+          created_at?: string
         }
       }
     }
@@ -381,3 +408,4 @@ export type PlaylistSong = Tables['playlist_songs']['Row']
 export type Recommendation = Tables['recommendations']['Row']
 export type FriendRequest = Tables['friend_requests']['Row']
 export type UserSpotifyToken = Tables['user_spotify_tokens']['Row']
+export type FavoriteSong = Tables['favorite_songs']['Row']

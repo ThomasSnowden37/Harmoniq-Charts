@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Box, Button, Card, Flex, Heading, Text, TextArea } from '@radix-ui/themes'
-import type { PlaylistWithSongs, PlaylistComment, PlaylistLike } from '../features/playlists/types'
+import type { PlaylistWithSongs, PlaylistComment } from '../features/playlists/types'
 import { MOCK_CURRENT_USER_ID } from '../lib/auth'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -23,8 +23,8 @@ export default function PlaylistPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Likes state
-  const [likes, setLikes] = useState<PlaylistLike[]>([])
+  // Likes state (store only the count)
+  const [likesCount, setLikesCount] = useState<number>(0)
   const [liked, setLiked] = useState(false)
   const [likeLoading, setLikeLoading] = useState(false)
 
@@ -32,6 +32,13 @@ export default function PlaylistPage() {
   const [comments, setComments] = useState<PlaylistComment[]>([])
   const [newComment, setNewComment] = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
+
+  // Listened progress state
+  const [listenedProgress, setListenedProgress] = useState<{ total: number; listened: number; percentage: number } | null>(null)
+
+  // Drag-and-drop reorder state
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   const MAX_COMMENT_LENGTH = 1000
   const trimmedComment = newComment.trim()
@@ -43,6 +50,7 @@ export default function PlaylistPage() {
     fetchLikes()
     checkLiked()
     fetchComments()
+    fetchListenedProgress()
   }, [playlistId])
 
   async function fetchPlaylist() {
@@ -66,8 +74,13 @@ export default function PlaylistPage() {
 
   async function fetchLikes() {
     try {
-      const res = await fetch(`/api/playlists/${playlistId}/likes`)
-      if (res.ok) setLikes(await res.json())
+      const res = await fetch(`/api/playlists/${playlistId}/likes`, {
+        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setLikesCount(typeof data === 'number' ? data : (data.count ?? 0))
+      }
     } catch {}
   }
 
@@ -87,12 +100,14 @@ export default function PlaylistPage() {
     setLikeLoading(true)
     try {
       if (liked) {
-        await fetch(`/api/playlists/${playlistId}/likes`, {
+        const res = await fetch(`/api/playlists/${playlistId}/likes`, {
           method: 'DELETE',
           headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
         })
-        setLiked(false)
-        setLikes(prev => prev.filter(l => l.user_id !== MOCK_CURRENT_USER_ID))
+        if (res.ok) {
+          setLiked(false)
+          setLikesCount(prev => Math.max(0, prev - 1))
+        }
       } else {
         const res = await fetch(`/api/playlists/${playlistId}/likes`, {
           method: 'POST',
@@ -100,7 +115,7 @@ export default function PlaylistPage() {
         })
         if (res.ok) {
           setLiked(true)
-          fetchLikes()
+          setLikesCount(prev => prev + 1)
         }
       }
     } catch {}
@@ -112,6 +127,41 @@ export default function PlaylistPage() {
       const res = await fetch(`/api/playlists/${playlistId}/comments`)
       if (res.ok) setComments(await res.json())
     } catch {}
+  }
+
+  async function fetchListenedProgress() {
+    try {
+      const res = await fetch(`/api/playlists/${playlistId}/listened-progress`, {
+        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+      })
+      if (res.ok) setListenedProgress(await res.json())
+    } catch {}
+  }
+
+  const isOwner = playlist?.user_id === MOCK_CURRENT_USER_ID
+
+  async function handleDrop(fromIndex: number, toIndex: number) {
+    if (!playlist || fromIndex === toIndex) return
+    const newSongs = [...playlist.songs]
+    const [moved] = newSongs.splice(fromIndex, 1)
+    newSongs.splice(toIndex, 0, moved)
+    setPlaylist({ ...playlist, songs: newSongs })
+    setDragIndex(null)
+    setDragOverIndex(null)
+
+    try {
+      await fetch(`/api/playlists/${playlistId}/reorder`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': MOCK_CURRENT_USER_ID,
+        },
+        body: JSON.stringify({ songIds: newSongs.map(s => s.id) }),
+      })
+    } catch {
+      // Revert on failure
+      fetchPlaylist()
+    }
   }
 
   async function submitComment() {
@@ -188,6 +238,16 @@ export default function PlaylistPage() {
               <Text size="2" color="gray" as="p" mt="1">
                 {playlist.songs.length} {playlist.songs.length === 1 ? 'song' : 'songs'}
               </Text>
+              {listenedProgress && listenedProgress.total > 0 && (
+                <Box mt="2" style={{ maxWidth: 220 }}>
+                  <Text size="1" color="gray">
+                    {listenedProgress.listened}/{listenedProgress.total} listened ({listenedProgress.percentage}%)
+                  </Text>
+                  <Box mt="1" style={{ height: 6, borderRadius: 3, backgroundColor: 'var(--gray-a4)', overflow: 'hidden' }}>
+                    <Box style={{ height: '100%', width: `${listenedProgress.percentage}%`, borderRadius: 3, backgroundColor: 'var(--accent-9)', transition: 'width 0.3s ease' }} />
+                  </Box>
+                </Box>
+              )}
             </div>
             <Button
               variant={liked ? 'solid' : 'outline'}
@@ -204,7 +264,7 @@ export default function PlaylistPage() {
               >
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
               </svg>
-              {likes.length}
+              {likesCount}
             </Button>
           </Flex>
         </Box>
@@ -218,22 +278,53 @@ export default function PlaylistPage() {
         ) : (
           <Flex direction="column" gap="2">
             {playlist.songs.map((song, idx) => (
-              <Link
+              <div
                 key={song.id}
-                to={`/songs/${song.id}`}
-                className="flex items-center gap-4 p-4 rounded-lg transition-colors"
-                style={{ backgroundColor: 'var(--gray-a3)' }}
-                onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--gray-a4)'}
-                onMouseOut={e => e.currentTarget.style.backgroundColor = 'var(--gray-a3)'}
+                draggable={isOwner}
+                onDragStart={() => isOwner && setDragIndex(idx)}
+                onDragOver={e => {
+                  if (!isOwner) return
+                  e.preventDefault()
+                  setDragOverIndex(idx)
+                }}
+                onDrop={e => {
+                  e.preventDefault()
+                  if (isOwner && dragIndex !== null) handleDrop(dragIndex, idx)
+                }}
+                onDragEnd={() => { setDragIndex(null); setDragOverIndex(null) }}
+                style={{
+                  opacity: dragIndex === idx ? 0.5 : 1,
+                  borderTop: dragOverIndex === idx && dragIndex !== null && dragIndex > idx ? '2px solid var(--accent-9)' : undefined,
+                  borderBottom: dragOverIndex === idx && dragIndex !== null && dragIndex < idx ? '2px solid var(--accent-9)' : undefined,
+                  cursor: isOwner ? 'grab' : undefined,
+                }}
               >
-                <Text color="gray" className="w-6 text-right">{idx + 1}</Text>
-                <div className="flex-1 min-w-0">
-                  <Text weight="medium" className="truncate block">{song.title}</Text>
-                  <Text size="2" color="gray">
-                    {song.genre} • {song.year_released} • {song.bpm} BPM
-                  </Text>
-                </div>
-              </Link>
+                <Link
+                  to={`/songs/${song.id}`}
+                  className="flex items-center gap-4 p-4 rounded-lg transition-colors hover-bg-gray"
+                  onClick={e => { if (dragIndex !== null) e.preventDefault() }}
+                >
+                  {isOwner && (
+                    <Text color="gray" style={{ cursor: 'grab', userSelect: 'none' }}>⠿</Text>
+                  )}
+                  <Text color="gray" className="w-6 text-right">{idx + 1}</Text>
+                  <div className="flex-1 min-w-0">
+                    <Text weight="medium" className="truncate block">{song.title}</Text>
+                    <Text size="2" color="gray">
+                      {(() => {
+                        const artists = (song as any)?.song_artists?.map((sa: any) => sa?.artists?.name).filter(Boolean)
+                        const artistStr = artists && artists.length ? artists.join(', ') : undefined
+                        return (
+                          <>
+                            {artistStr && <>{artistStr} • </>}
+                            {song.genre} • {song.year_released} • {song.bpm} BPM
+                          </>
+                        )
+                      })()}
+                    </Text>
+                  </div>
+                </Link>
+              </div>
             ))}
           </Flex>
         )}

@@ -34,6 +34,7 @@ CREATE TABLE songs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE SET NULL,
     spotify_id VARCHAR(50)
+    trending_score NUMERIC DEFAULT 0,
 );
 
 -- MANY TO MANY TABLES
@@ -109,6 +110,7 @@ CREATE TABLE playlist_songs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     playlist_id UUID REFERENCES playlists(id) ON DELETE CASCADE NOT NULL,
     song_id UUID REFERENCES songs(id) ON DELETE CASCADE NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0,
     added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(playlist_id, song_id) -- No duplicate songs in a playlist
 );
@@ -163,6 +165,17 @@ CREATE TABLE recommendations (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- FAVORITE SONGS
+CREATE TABLE favorite_songs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    song_id UUID REFERENCES songs(id) ON DELETE CASCADE NOT NULL,
+    position INTEGER NOT NULL CHECK (position >= 0 AND position <= 4),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, song_id),
+    UNIQUE(user_id, position)
+);
+
 -- Speed up queries for user's content
 CREATE INDEX idx_reviews_user_id ON reviews(user_id);
 CREATE INDEX idx_reviews_song_id ON reviews(song_id);
@@ -181,6 +194,7 @@ CREATE INDEX idx_songs_album_id ON songs(album_id);
 CREATE INDEX idx_recommendations_source ON recommendations(source_song_id);
 CREATE INDEX idx_friend_requests_requester ON friend_requests(requester_id);
 CREATE INDEX idx_friend_requests_addressee ON friend_requests(addressee_id);
+CREATE INDEX idx_favorite_songs_user ON favorite_songs(user_id);
 
 -- Enable RLS on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -201,6 +215,7 @@ ALTER TABLE song_artists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE album_artists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recommendations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE friend_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE favorite_songs ENABLE ROW LEVEL SECURITY;
 
 -- Policies for public content (songs, artists, albums)
 CREATE POLICY "Public read access" ON songs FOR SELECT USING (true);
@@ -272,3 +287,9 @@ CREATE POLICY "Users can update received requests" ON friend_requests FOR UPDATE
     USING (auth.uid() = addressee_id);
 CREATE POLICY "Users can cancel sent requests" ON friend_requests FOR DELETE
     USING (auth.uid() = requester_id);
+
+-- Favorite songs
+CREATE POLICY "Anyone can read favorite songs" ON favorite_songs FOR SELECT USING (true);
+CREATE POLICY "Users can manage own favorite songs" ON favorite_songs FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own favorite songs" ON favorite_songs FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own favorite songs" ON favorite_songs FOR DELETE USING (auth.uid() = user_id);

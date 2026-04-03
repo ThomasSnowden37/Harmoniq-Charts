@@ -9,6 +9,11 @@ import songRouter from './routes/song.js'
 import authRouter from './routes/auth.js'
 import playlistRouter from './routes/playlists.js'
 import spotifyRouter from './routes/spotify.js'
+import likesRouter from './routes/likes.js'
+import reviewsRouter from './routes/reviews.js'
+import ratingsRouter from './routes/ratings.js'
+import trendingRouter from './routes/trending.js'
+import favoriteSongsRouter from './routes/favoriteSongs.js'
 
 dotenv.config()
 
@@ -25,6 +30,11 @@ app.use('/api/songs', songRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/playlists', playlistRouter)
 app.use('/api/spotify', spotifyRouter)
+app.use('/api/likes', likesRouter)
+app.use('/api/reviews', reviewsRouter)
+app.use('/api/ratings', ratingsRouter)
+app.use('/api/trending', trendingRouter)
+app.use('/api/favorite-songs', favoriteSongsRouter)
 
 // Test the supabase connection with this endpoint
 app.get('/api/test-db', async (req, res) => {
