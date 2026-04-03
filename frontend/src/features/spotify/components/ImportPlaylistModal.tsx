@@ -192,7 +192,7 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
             </div>
             <Flex gap="2" justify="end">
               <Button variant="soft" onClick={() => setSelectedPlaylist(null)}>Back</Button>
-              <Button onClick={handleImport} disabled={importing}>
+              <Button onClick={() => handleImport()} disabled={importing}>
                 {importing ? (
                   <>
                     <Spinner size="1" />

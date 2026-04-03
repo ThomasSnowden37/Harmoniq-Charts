@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, Link as RouterLink } from 'react-router-dom'
 import { MOCK_CURRENT_USER_ID } from '../lib/auth'
 import FriendsModal from '../features/friends/components/FriendsModal'
 import SettingsModal from '../features/settings/components/SettingsModal'
@@ -80,13 +80,13 @@ export default function UserProfile() {
   const [showFavoritesModal, setShowFavoritesModal] = useState(false)
   const [copied, setCopied] = useState(false);
 
-  const isOwnProfile = userId === MOCK_CURRENT_USER_ID
+    const isOwnProfile = userId === MOCK_CURRENT_USER_ID
 
   // Handle Spotify OAuth callback query params
   useEffect(() => {
     const spotifyConnected = searchParams.get('spotify_connected')
     const spotifyError = searchParams.get('spotify_error')
-    
+
     if (spotifyConnected === 'true') {
       setSpotifyMessage('Spotify connected successfully!')
       setSearchParams({}) // Clear query params
@@ -206,6 +206,8 @@ export default function UserProfile() {
       }
     } catch (err) {
       console.error('Failed to fetch Spotify info:', err)
+    }
+  }
   async function fetchPlaylistCount() {
     try {
       const res = await fetch(`/api/playlists/user/${userId}/count`)
@@ -332,9 +334,9 @@ export default function UserProfile() {
 
   function renderActionButtons() {
     const shareBtn = (
-      <Button 
-        variant="soft" 
-        color={copied ? "green" : "gray"} 
+      <Button
+        variant="soft"
+        color={copied ? "green" : "gray"}
         onClick={handleCopyLink}
       >
         {copied ? <Check size={16} /> : <Share2 size={16} />}
@@ -397,10 +399,10 @@ export default function UserProfile() {
   const handleCopyLink = () => {
     // Grab the current window URL
     navigator.clipboard.writeText(window.location.href);
-    
+
     // Provide visual feedback
     setCopied(true);
-    
+
     // Reset after 3 seconds
     setTimeout(() => setCopied(false), 3000);
   };
@@ -433,18 +435,18 @@ export default function UserProfile() {
   return (
     <Box className="min-h-screen bg-background flex flex-col">
       <Navbar />
-      
+
       {/* Spotify connection notification */}
       {spotifyMessage && (
-        <Box 
-          p="3" 
-          style={{ 
+        <Box
+          p="3"
+          style={{
             backgroundColor: spotifyMessage.includes('failed') ? 'var(--red-3)' : 'var(--green-3)',
             borderBottom: '1px solid var(--gray-6)'
           }}
         >
-          <Text 
-            size="2" 
+          <Text
+            size="2"
             color={spotifyMessage.includes('failed') ? 'red' : 'green'}
             align="center"
             style={{ display: 'block' }}
@@ -453,7 +455,7 @@ export default function UserProfile() {
           </Text>
         </Box>
       )}
-      
+
       <Box className="max-w-3xl w-full mx-auto flex-grow" p="4" pt="6">
         {/* Profile Header */}
         <Card size="3">
@@ -488,7 +490,7 @@ export default function UserProfile() {
                       style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
                       </svg>
                       {spotifyInfo.displayName || 'Spotify'}
                     </Badge>
@@ -512,7 +514,7 @@ export default function UserProfile() {
                   style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}
                 >
                   {(() => {
-                    
+
                     const names = mutualFriends.slice(0, 3).map(m => m.username)
                     const more = Math.max(0, mutualFriends.length - names.length)
                     return (
@@ -569,7 +571,7 @@ export default function UserProfile() {
             ) : (
               <Flex direction="column" gap="2">
                 {favoriteSongs.map((fav, idx) => (
-                  <Link
+                  <RouterLink
                     key={fav.id}
                     to={`/songs/${fav.songs.id}`}
                     className="flex items-center gap-3 p-3 rounded-lg transition-colors hover-bg-gray no-underline"
@@ -590,7 +592,7 @@ export default function UserProfile() {
                         })()}
                       </Text>
                     </Box>
-                  </Link>
+                  </RouterLink>
                 ))}
               </Flex>
             )}
@@ -727,12 +729,12 @@ export default function UserProfile() {
       )}
 
       <DeleteUserModal
-          isOpen={deleteUserModal}
-          onClose={() => setDeleteUserModal(false)}
-          onDeleted={() => {
-            window.location.href = '/'
-          }}
-        />
+        isOpen={deleteUserModal}
+        onClose={() => setDeleteUserModal(false)}
+        onDeleted={() => {
+          window.location.href = '/'
+        }}
+      />
 
       {isOwnProfile && (
         <ManageFavoritesModal
