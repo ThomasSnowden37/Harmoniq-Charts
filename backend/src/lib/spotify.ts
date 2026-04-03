@@ -37,6 +37,9 @@ export interface SpotifyTokens {
   token_type: string
 }
 
+// Public-open Spotify URL base for tracks 
+export const SPOTIFY_OPEN_TRACK_URL = 'https://open.spotify.com/track/'
+
 /**
  * Create SDK instance with an existing access token
  */

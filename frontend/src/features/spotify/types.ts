@@ -12,7 +12,8 @@ export interface SpotifyPlaylist {
   name: string
   description: string | null
   images: Array<{ url: string; height: number; width: number }>
-  tracks: {
+  items: {
+    href?: string
     total: number
   }
   owner: {

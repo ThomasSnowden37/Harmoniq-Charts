@@ -11,6 +11,7 @@ CREATE TABLE users (
 CREATE TABLE artists (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
+    spotify_id VARCHAR(50),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -18,6 +19,7 @@ CREATE TABLE artists (
 CREATE TABLE albums (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
+    spotify_id VARCHAR(50),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -31,8 +33,7 @@ CREATE TABLE songs (
     album_id UUID REFERENCES albums(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE SET NULL,
-    spotify_id VARCHAR(50),
-    spotify_url TEXT
+    spotify_id VARCHAR(50)
 );
 
 -- MANY TO MANY TABLES

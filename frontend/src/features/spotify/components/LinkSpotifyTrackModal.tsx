@@ -4,6 +4,7 @@ import { Search, X, Link, Trash2 } from 'lucide-react'
 import { useSpotify } from '../context/SpotifyContext'
 import { MOCK_CURRENT_USER_ID } from '../../../lib/auth'
 import type { SpotifyTrack } from '../types'
+import { SPOTIFY_OPEN_TRACK_URL } from '../../../lib/spotify'
 
 interface LinkSpotifyTrackModalProps {
   open: boolean
@@ -11,8 +12,7 @@ interface LinkSpotifyTrackModalProps {
   songTitle: string
   artistName?: string
   currentSpotifyId?: string | null
-  currentSpotifyUrl?: string | null
-  onLink: (spotifyId: string, spotifyUrl: string) => Promise<void>
+  onLink: (spotifyId: string) => Promise<void>
   onUnlink: () => Promise<void>
 }
 
@@ -22,7 +22,6 @@ export function LinkSpotifyTrackModal({
   songTitle,
   artistName,
   currentSpotifyId,
-  currentSpotifyUrl,
   onLink,
   onUnlink,
 }: LinkSpotifyTrackModalProps) {
@@ -104,7 +103,7 @@ export function LinkSpotifyTrackModal({
     setError(null)
 
     try {
-      await onLink(track.id, track.external_urls.spotify)
+      await onLink(track.id)
       setCurrentTrackInfo(track)
       onOpenChange(false)
     } catch (err) {
@@ -145,10 +144,10 @@ export function LinkSpotifyTrackModal({
     return (
       <Dialog.Root open={open} onOpenChange={onOpenChange}>
         <Dialog.Content maxWidth="400px">
-          <Dialog.Title>Link Spotify Track</Dialog.Title>
+          <Dialog.Title>Link Spotify Song</Dialog.Title>
           <Flex direction="column" gap="3" py="4" align="center">
             <Text color="gray">
-              Connect your Spotify account in Settings to link tracks.
+              Connect your Spotify account in Settings to link songs.
             </Text>
             <Button variant="soft" onClick={handleClose}>
               Close
@@ -162,9 +161,9 @@ export function LinkSpotifyTrackModal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Content maxWidth="550px">
-        <Dialog.Title>Link Spotify Track</Dialog.Title>
+        <Dialog.Title>Link Spotify Song</Dialog.Title>
         <Dialog.Description size="2" color="gray">
-          Search for a track on Spotify to link to "{songTitle}"
+          Search for a song on Spotify to link to "{songTitle}"
         </Dialog.Description>
 
         <Flex direction="column" gap="4" mt="4">
@@ -193,7 +192,7 @@ export function LinkSpotifyTrackModal({
                     color="green"
                     asChild
                   >
-                    <a href={currentSpotifyUrl || '#'} target="_blank" rel="noopener noreferrer">
+                    <a href={currentSpotifyId ? `${SPOTIFY_OPEN_TRACK_URL}${currentSpotifyId}` : '#'} target="_blank" rel="noopener noreferrer">
                       Open in Spotify
                     </a>
                   </Button>

@@ -60,9 +60,11 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
     }
   }
 
-  async function handleImport() {
-    if (!selectedPlaylist) return
+  async function handleImport(playlistParam?: SpotifyPlaylist) {
+    const pl = playlistParam || selectedPlaylist
+    if (!pl) return
 
+    setSelectedPlaylist(pl)
     setImporting(true)
     setError(null)
     try {
@@ -73,13 +75,13 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
           'x-user-id': MOCK_CURRENT_USER_ID,
         },
         body: JSON.stringify({
-          spotifyPlaylistId: selectedPlaylist.id,
-          playlistName: customName || selectedPlaylist.name,
+          spotifyPlaylistId: pl.id,
+          playlistName: customName || pl.name,
         }),
       })
 
       if (!res.ok) {
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Failed to import playlist')
       }
 
@@ -176,7 +178,7 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
                 )}
                 <div>
                   <Text weight="medium">{selectedPlaylist.name}</Text>
-                  <Text size="2" color="gray" as="p">{selectedPlaylist.tracks.total} tracks</Text>
+                  <Text size="2" color="gray" as="p">{selectedPlaylist.items?.total ?? 0} songs</Text>
                 </div>
               </Flex>
             </div>
@@ -222,7 +224,7 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
                   {playlists.map((playlist) => (
                     <button
                       key={playlist.id}
-                      onClick={() => setSelectedPlaylist(playlist)}
+                      onClick={() => handleImport(playlist)}
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary transition-colors text-left w-full cursor-pointer"
                     >
                       {playlist.images?.[0] ? (
@@ -240,7 +242,7 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
                       )}
                       <div className="flex-1 min-w-0">
                         <Text weight="medium" className="truncate block">{playlist.name}</Text>
-                        <Text size="1" color="gray">{playlist.tracks.total} tracks • {playlist.owner.display_name}</Text>
+                        <Text size="1" color="gray">{playlist.items?.total ?? 0} songs • {playlist.owner?.display_name ?? 'Unknown'}</Text>
                       </div>
                     </button>
                   ))}

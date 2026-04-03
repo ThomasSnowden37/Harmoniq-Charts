@@ -71,7 +71,6 @@ export interface Database {
           created_at: string
           user_id: string | null
           spotify_id: string | null
-          spotify_url: string | null
         }
         Insert: {
           id?: string
@@ -83,7 +82,6 @@ export interface Database {
           created_at?: string
           user_id: string | null
           spotify_id?: string | null
-          spotify_url?: string | null
         }
         Update: {
           id?: string
@@ -95,7 +93,6 @@ export interface Database {
           created_at?: string
           user_id: string | null
           spotify_id?: string | null
-          spotify_url?: string | null
         }
       }
       song_artists: {

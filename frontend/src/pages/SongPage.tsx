@@ -9,6 +9,7 @@ import { useSpotify } from '../features/spotify/context/SpotifyContext'
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { SPOTIFY_OPEN_TRACK_URL } from '../lib/spotify'
 
 
 
@@ -30,7 +31,6 @@ interface Song {
     year_released: number
     user_id: string
     spotify_id?: string | null
-    spotify_url?: string | null
 }
 
 export default function SongPage() {
@@ -127,14 +127,9 @@ export default function SongPage() {
       <p> Listeners: {listenedCount}</p>
 
       {/* Spotify "Listen on Spotify" button */}
-      {song.spotify_url && (
-        <Button
-          size="2"
-          color="green"
-          className="mt-4"
-          asChild
-        >
-          <a href={song.spotify_url} target="_blank" rel="noopener noreferrer">
+      {song.spotify_id && (
+        <Button size="2" color="green" className="mt-4" asChild>
+          <a href={`${SPOTIFY_OPEN_TRACK_URL}${song.spotify_id}`} target="_blank" rel="noopener noreferrer">
             🎵 Listen on Spotify
           </a>
         </Button>
@@ -210,15 +205,14 @@ export default function SongPage() {
         onOpenChange={setSpotifyLinkOpen}
         songTitle={song.title}
         currentSpotifyId={song.spotify_id}
-        currentSpotifyUrl={song.spotify_url}
-        onLink={async (spotifyId, spotifyUrl) => {
+        onLink={async (spotifyId) => {
           const res = await fetch(`/api/songs/${song.id}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
               'x-user-id': user?.id || '',
             },
-            body: JSON.stringify({ spotify_id: spotifyId, spotify_url: spotifyUrl }),
+            body: JSON.stringify({ spotify_id: spotifyId }),
           })
           if (!res.ok) throw new Error('Failed to update song')
           const updated = await res.json()
@@ -231,7 +225,7 @@ export default function SongPage() {
               'Content-Type': 'application/json',
               'x-user-id': user?.id || '',
             },
-            body: JSON.stringify({ spotify_id: null, spotify_url: null }),
+            body: JSON.stringify({ spotify_id: null }),
           })
           if (!res.ok) throw new Error('Failed to update song')
           const updated = await res.json()
