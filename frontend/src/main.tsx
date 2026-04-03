@@ -7,6 +7,7 @@ import './index.css'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from 'next-themes'
+import { SpotifyProvider } from './features/spotify/context/SpotifyContext'
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -16,7 +17,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <ThemeProvider attribute="class">
         <Theme accentColor="blue" radius="medium">
           <AuthProvider>
-            <App />
+            <SpotifyProvider>
+              <App />
+            </SpotifyProvider>
           </AuthProvider>
         </Theme>
       </ThemeProvider>

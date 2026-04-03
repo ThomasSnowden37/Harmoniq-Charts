@@ -3,6 +3,7 @@ import { Dialog, Button } from '@radix-ui/themes'
 import { X } from 'lucide-react'
 import { MOCK_CURRENT_USER_ID } from '../../../lib/auth'
 import type { PrivacySetting } from '../types'
+import SpotifyConnectButton from '../../spotify/components/SpotifyConnectButton'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -182,6 +183,17 @@ export default function SettingsModal({
                   }`}
                 />
               </button>
+            </div>
+          </div>
+
+          {/* Spotify Connection */}
+          <div>
+            <h3 className="text-sm font-medium text-foreground mb-1">Spotify Connection</h3>
+            <p className="text-muted-foreground text-xs mb-3">
+              Connect your Spotify account to import playlists and link songs.
+            </p>
+            <div className="bg-secondary rounded-lg p-4">
+              <SpotifyConnectButton />
             </div>
           </div>
 

@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         // Sync with backend to create the user in Supabase
-        const res = await fetch('http://localhost:3001/api/auth/google-sync', {
+        const res = await fetch('/api/auth/google-sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

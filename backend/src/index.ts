@@ -8,6 +8,7 @@ import usersRouter from './routes/users.js'
 import songRouter from './routes/song.js'
 import authRouter from './routes/auth.js'
 import playlistRouter from './routes/playlists.js'
+import spotifyRouter from './routes/spotify.js'
 import likesRouter from './routes/likes.js'
 import reviewsRouter from './routes/reviews.js'
 import ratingsRouter from './routes/ratings.js'
@@ -29,6 +30,7 @@ app.use('/api/users', usersRouter)
 app.use('/api/songs', songRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/playlists', playlistRouter)
+app.use('/api/spotify', spotifyRouter)
 app.use('/api/likes', likesRouter)
 app.use('/api/reviews', reviewsRouter)
 app.use('/api/ratings', ratingsRouter)

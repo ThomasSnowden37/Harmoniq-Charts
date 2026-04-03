@@ -4,10 +4,13 @@ import { Button, Avatar } from '@radix-ui/themes'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
+import { LinkSpotifyTrackModal } from '../features/spotify/components/LinkSpotifyTrackModal'
+import { useSpotify } from '../features/spotify/context/SpotifyContext'
 import RatingSong from '../features/songs/components/RatingSong'
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { SPOTIFY_OPEN_TRACK_URL } from '../lib/spotify'
 
 /**
  * SongPage.tsx
@@ -26,11 +29,13 @@ interface Song {
     genre: string
     year_released: number
     user_id: string
+    spotify_id?: string | null
     album_id?: string
 }
 
 export default function SongPage() {
     const { user } = useAuth()
+    const { isConnected: spotifyConnected } = useSpotify()
     const { id } = useParams()
     const [loading, setLoading] = useState(true)
     const [song, setSong] = useState<Song | null>(null)
@@ -38,6 +43,7 @@ export default function SongPage() {
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
     const [playlistOpen, setPlaylistOpen] = useState(false)
+    const [spotifyLinkOpen, setSpotifyLinkOpen] = useState(false)
     const [listenedCount, setListenedCount] = useState(0)
     const [listened, setListened] = useState(false)
     const [listento, setListento] = useState(false)
@@ -61,7 +67,7 @@ export default function SongPage() {
       async function fetchSong() {
         setLoading(true)
         try {
-          const res = await fetch(`http://localhost:3001/api/songs/${id}`)
+          const res = await fetch(`/api/songs/${id}`)
           const data = await res.json()
 
           if (!res.ok) {
@@ -72,7 +78,7 @@ export default function SongPage() {
           setSong(data)
 
           const countRes = await fetch(
-            `http://localhost:3001/api/songs/${id}/listened/count`
+            `/api/songs/${id}/listened/count`
           )
           const countData = await countRes.json()
           if (countRes.ok) setListenedCount(countData.total)
@@ -103,14 +109,14 @@ export default function SongPage() {
       async function fetchUserSongData() {
       try {
         const resLis = await fetch(
-          `http://localhost:3001/api/songs/${id}/listened`,
+          `/api/songs/${id}/listened`,
           { headers: { 'x-user-id': userId } }
         )
         const listenedData = await resLis.json()
         if (resLis.ok) setListened(listenedData.listened)
 
         const toLis = await fetch(
-          `http://localhost:3001/api/songs/${id}/listento`,
+          `/api/songs/${id}/listento`,
           { headers: { 'x-user-id': userId } }
         )
         const listentoData = await toLis.json()
@@ -182,6 +188,15 @@ const handleAddAlbum = async (target: 'listento' | 'listened') => {
 
       <RatingSong id = {song.id} />
 
+      {/* Spotify "Listen on Spotify" button */}
+      {song.spotify_id && (
+        <Button size="2" color="green" className="mt-4" asChild>
+          <a href={`${SPOTIFY_OPEN_TRACK_URL}${song.spotify_id}`} target="_blank" rel="noopener noreferrer">
+            🎵 Listen on Spotify
+          </a>
+        </Button>
+      )}
+
       {/* Delete button only if user created song*/}
       {user && user.id == song.user_id && ( //User must be logged in and created for it to show up
         <>
@@ -201,6 +216,18 @@ const handleAddAlbum = async (target: 'listento' | 'listened') => {
       >
         Edit Song
       </Button>
+      {/* Link to Spotify button - only if Spotify connected */}
+      {spotifyConnected && (
+        <Button
+          size="2"
+          color="green"
+          variant="soft"
+          onClick={() => setSpotifyLinkOpen(true)}
+          className="mt-6"
+        >
+          {song.spotify_id ? '🔗 Update Spotify Link' : '🎵 Link to Spotify'}
+        </Button>
+      )}
         </>
       )}
 
@@ -235,6 +262,38 @@ const handleAddAlbum = async (target: 'listento' | 'listened') => {
         onClose={() => setPlaylistOpen(false)}
         songId={song.id}
       />
+      <LinkSpotifyTrackModal
+        open={spotifyLinkOpen}
+        onOpenChange={setSpotifyLinkOpen}
+        songTitle={song.title}
+        currentSpotifyId={song.spotify_id}
+        onLink={async (spotifyId) => {
+          const res = await fetch(`/api/songs/${song.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': user?.id || '',
+            },
+            body: JSON.stringify({ spotify_id: spotifyId }),
+          })
+          if (!res.ok) throw new Error('Failed to update song')
+          const updated = await res.json()
+          setSong(updated)
+        }}
+        onUnlink={async () => {
+          const res = await fetch(`/api/songs/${song.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': user?.id || '',
+            },
+            body: JSON.stringify({ spotify_id: null }),
+          })
+          if (!res.ok) throw new Error('Failed to update song')
+          const updated = await res.json()
+          setSong(updated)
+        }}
+      />
       {song.album_id && (
                 <AddToPlaylistModal
                     isOpen={albumPlaylistOpen}
@@ -254,7 +313,7 @@ const handleAddAlbum = async (target: 'listento' | 'listened') => {
       if (!user) return alert("You must be logged in to mark as listened")
       try {
       const method = listened ? 'DELETE' : 'POST'
-      const res = await fetch(`http://localhost:3001/api/songs/${id}/listened`, {
+      const res = await fetch(`/api/songs/${id}/listened`, {
         method,
         headers: { 'x-user-id': user.id }
       })
@@ -280,7 +339,7 @@ const handleAddAlbum = async (target: 'listento' | 'listened') => {
       if (!user) return alert("You must be logged in to mark as listen to")
       try {
       const method = listento? 'DELETE' : 'POST'
-      const res = await fetch(`http://localhost:3001/api/songs/${id}/listento`, {
+      const res = await fetch(`/api/songs/${id}/listento`, {
         method,
         headers: { 'x-user-id': user.id }
       })
