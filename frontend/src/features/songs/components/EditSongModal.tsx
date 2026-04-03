@@ -14,6 +14,7 @@ interface Song {
     genre: string
     year_released: number
     user_id: string
+  spotify_id?: string | null
 }
 
 interface EditSongModalProps {
@@ -51,7 +52,7 @@ export default function EditSongModal({ isOpen, onClose, song, onUpdated }: Edit
     const year_released = Number(form.get('year_released') ?? 0)
 
     try {
-      const res = await fetch(`http://localhost:3001/api/songs/${song.id}`, {
+      const res = await fetch(`/api/songs/${song.id}`, {
         method: 'PATCH',
         headers: {
                 'Content-Type': 'application/json',

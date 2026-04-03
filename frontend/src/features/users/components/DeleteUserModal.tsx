@@ -29,7 +29,7 @@ async function handleDelete() {
     setError(null)
     try {
         const res = await fetch(
-            `http://localhost:3001/api/users/${user.id}`,
+            `/api/users/${user.id}`,
             { method: 'DELETE',
               headers: {
                 'x-user-id': user.id 
@@ -37,11 +37,10 @@ async function handleDelete() {
             })
             
         const text = await res.text()
-    let data
     try {
-      data = JSON.parse(text)   
+      JSON.parse(text)   
     } catch {
-      data = null              
+      // ignore parse errors
     }
         setSuccess('Account deleted successfully')
         setTimeout(() => {

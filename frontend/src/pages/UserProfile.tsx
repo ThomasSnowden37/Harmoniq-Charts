@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { MOCK_CURRENT_USER_ID } from '../lib/auth'
 import FriendsModal from '../features/friends/components/FriendsModal'
 import SettingsModal from '../features/settings/components/SettingsModal'
@@ -9,6 +9,7 @@ import ManageFavoritesModal from '../features/songs/components/ManageFavoritesMo
 import MutualFriendsModal from '../features/friends/components/MutualFriendsModal'
 import type { PrivacySetting } from '../features/settings/types'
 import type { Playlist } from '../features/playlists/types'
+import type { SpotifyConnectionStatus } from '../features/spotify/types'
 import {
   Avatar,
   Badge,
@@ -17,6 +18,7 @@ import {
   Card,
   Flex,
   Heading,
+  Link,
   Separator,
   Tabs,
   Text,
@@ -54,6 +56,7 @@ interface RelationshipData {
 
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null)
   const [relationship, setRelationship] = useState<RelationshipData>({ status: 'none' })
   const [loading, setLoading] = useState(true)
@@ -69,6 +72,8 @@ export default function UserProfile() {
   const [likedSongs, setLikedSongs] = useState<{ id: string; title: string; genre: string; year_released: number; bpm: number }[]>([])
   const [userReviews, setUserReviews] = useState<{ id: string; content: string; created_at: string; song_id: string; songs: { id: string; title: string; genre: string; year_released: number } }[]>([])
   const [deleteUserModal, setDeleteUserModal] = useState(false)
+  const [spotifyInfo, setSpotifyInfo] = useState<SpotifyConnectionStatus | null>(null)
+  const [spotifyMessage, setSpotifyMessage] = useState<string | null>(null)
   const [mutualFriends, setMutualFriends] = useState<{ id: string; username: string }[]>([])
   const [showMutualModal, setShowMutualModal] = useState(false)
   const [favoriteSongs, setFavoriteSongs] = useState<{ id: string; song_id: string; position: number; songs: { id: string; title: string; bpm: number; genre: string; year_released: number; song_artists?: Array<{ artists?: { id: string; name: string } }> } }[]>([])
@@ -77,6 +82,24 @@ export default function UserProfile() {
 
   const isOwnProfile = userId === MOCK_CURRENT_USER_ID
 
+  // Handle Spotify OAuth callback query params
+  useEffect(() => {
+    const spotifyConnected = searchParams.get('spotify_connected')
+    const spotifyError = searchParams.get('spotify_error')
+    
+    if (spotifyConnected === 'true') {
+      setSpotifyMessage('Spotify connected successfully!')
+      setSearchParams({}) // Clear query params
+      fetchSpotifyInfo() // Refresh spotify info
+      setTimeout(() => setSpotifyMessage(null), 5000)
+    } else if (spotifyError) {
+      setSpotifyMessage(`Spotify connection failed: ${spotifyError}`)
+      setSearchParams({})
+      setTimeout(() => setSpotifyMessage(null), 5000)
+    }
+  }, [searchParams])
+
+  // TODO: Replace with real data from API
   const stats = {
     reviews: userReviews.length,
     friends: friendCount,
@@ -92,6 +115,7 @@ export default function UserProfile() {
     fetchProfile()
     fetchPlaylistCount()
     fetchFriendCount()
+    fetchSpotifyInfo()
     fetchLikedSongs()
     fetchUserReviews()
     fetchFavoriteSongs()
@@ -171,6 +195,17 @@ export default function UserProfile() {
     }
   }
 
+  async function fetchSpotifyInfo() {
+    try {
+      const res = await fetch(`/api/users/${userId}/spotify`, {
+        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSpotifyInfo(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch Spotify info:', err)
   async function fetchPlaylistCount() {
     try {
       const res = await fetch(`/api/playlists/user/${userId}/count`)
@@ -398,6 +433,27 @@ export default function UserProfile() {
   return (
     <Box className="min-h-screen bg-background flex flex-col">
       <Navbar />
+      
+      {/* Spotify connection notification */}
+      {spotifyMessage && (
+        <Box 
+          p="3" 
+          style={{ 
+            backgroundColor: spotifyMessage.includes('failed') ? 'var(--red-3)' : 'var(--green-3)',
+            borderBottom: '1px solid var(--gray-6)'
+          }}
+        >
+          <Text 
+            size="2" 
+            color={spotifyMessage.includes('failed') ? 'red' : 'green'}
+            align="center"
+            style={{ display: 'block' }}
+          >
+            {spotifyMessage}
+          </Text>
+        </Box>
+      )}
+      
       <Box className="max-w-3xl w-full mx-auto flex-grow" p="4" pt="6">
         {/* Profile Header */}
         <Card size="3">
@@ -418,6 +474,25 @@ export default function UserProfile() {
                 </Badge>
                 {relationship.status === 'friends' && (
                   <Badge variant="soft" color="green">Friends</Badge>
+                )}
+                {spotifyInfo?.connected && (
+                  <Link
+                    href={spotifyInfo.profileUrl || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Badge
+                      variant="soft"
+                      color="green"
+                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                      </svg>
+                      {spotifyInfo.displayName || 'Spotify'}
+                    </Badge>
+                  </Link>
                 )}
               </Flex>
               <Box mt="3">

@@ -33,7 +33,7 @@ async function handleDelete() {
     setError(null)
     try {
         const res = await fetch(
-            `http://localhost:3001/api/songs/${songId}`,
+            `/api/songs/${songId}`,
             { method: 'DELETE',
               headers: {
                 'Content-Type': 'application/json',

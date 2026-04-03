@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { generateKey } from 'crypto'
+import * as spotify from '../lib/spotify.js'
 
 /**
  * song.ts
@@ -76,13 +77,24 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/add', async (req, res) => {
 
-    const { userId, title, bpm, genre, year_released, album_name, artist_name} = req.body
+    const { userId, title, bpm, genre, year_released, album_name, artist_name, spotify_id } = req.body
 
     if (!userId)
         return res.status(400).json({ error: 'Must be logged in to add song' })
 
-    if (!title || !bpm || !genre || !year_released || !album_name || !artist_name)
+    // Require essential fields; allow bpm and genre to be optional
+    if (!title || !year_released || !album_name || !artist_name)
         return res.status(400).json({ error: 'Missing required fields' })
+
+    // Normalize optional BPM and validate if provided
+    let bpmValue: number | null = null
+    if (bpm !== undefined && bpm !== null && bpm !== '') {
+      const n = Number(bpm)
+      if (isNaN(n) || n < 0) return res.status(400).json({ error: 'Invalid BPM' })
+      bpmValue = n
+    }
+
+    const genreValue = genre === undefined || genre === null || genre === '' ? null : genre
 
     console.log(userId)
 
@@ -178,10 +190,11 @@ router.post('/add', async (req, res) => {
         .insert({
             user_id: userId ?? null,
             title,
-            bpm,
-            genre,
+            bpm: bpmValue,
+            genre: genreValue,
             year_released,
-            album_id, 
+            album_id,
+            spotify_id: spotify_id ?? null,
         })
         .select()
         .single()
@@ -245,7 +258,7 @@ router.delete('/:id', async (req, res) => {
 router.patch('/:id', async (req, res) => {
     const songId = req.params.id
     const userId = req.headers['x-user-id'] as string
-    const {title, bpm, genre, year_released} = req.body
+    const {title, bpm, genre, year_released, spotify_id} = req.body
 
     if (!userId ) {
         return res.status(400).json({ error: 'User not logged in' })
@@ -276,9 +289,15 @@ router.patch('/:id', async (req, res) => {
             return res.status(403).json({ error: 'You can only edit your own songs' })
         }
 
+        // Build update object; only set spotify_id when provided in request
+        const updateFields: any = { title, bpm, genre, year_released }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'spotify_id')) {
+            updateFields.spotify_id = spotify_id
+        }
+
         const{ data, error: errorUpdate} = await supabase
             .from('songs')
-            .update({ title, bpm, genre, year_released })
+            .update(updateFields)
             .eq('id', songId)
             .select()
             .single()

@@ -1,21 +1,19 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase';
+import { useState } from 'react'
 import { Form } from "radix-ui";
 import {
-  Avatar,
-  Badge,
   Box,
   Button,
   Card,
   Flex,
   Heading,
-  Separator,
-  Tabs,
   Text,
 } from '@radix-ui/themes'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext';
+import { useSpotify } from '../features/spotify/context/SpotifyContext'
+import { LinkSpotifyTrackModal } from '../features/spotify/components/LinkSpotifyTrackModal'
+import type { SpotifyTrack } from '../features/spotify/types'
 
 /**
  * TODO:
@@ -35,8 +33,12 @@ import { useAuth } from '../context/AuthContext';
 
 export default function CreateSong() {
   const { user } = useAuth()
+  const { isConnected: spotifyConnected } = useSpotify()
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [spotifyModalOpen, setSpotifyModalOpen] = useState(false)
+  const [linkedSpotifyTrack, setLinkedSpotifyTrack] = useState<SpotifyTrack | null>(null)
+  const [importModalOpen, setImportModalOpen] = useState(false)
 
  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -53,30 +55,34 @@ export default function CreateSong() {
     const forms = e.currentTarget
     const form = new FormData(e.currentTarget)
     const title = form.get('title')?.toString() ?? ''
-    const bpm = Number(form.get('bpm') ?? 0)
-    const genre = form.get('genre')?.toString() ?? ''
+    const bpmRaw = form.get('bpm')?.toString() ?? ''
+    const bpm = bpmRaw === '' ? null : Number(bpmRaw)
+    const genreRaw = form.get('genre')?.toString() ?? ''
+    const genre = genreRaw === '' ? null : genreRaw
     const year_released = Number(form.get('year_released') ?? 0)
     const album_name = form.get('album')?.toString() ?? ''
     const artist_name = form.get('artist')?.toString() ?? ''
     try {
-        const res = await fetch('http://localhost:3001/api/songs/add', {
+        const res = await fetch('/api/songs/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-user-id': userId,},
           body: JSON.stringify({
-          userId: userId,
-          title,
-          bpm,
-          genre,
-          year_released,  
-          album_name,
-          artist_name,
-        }),
+            userId: userId,
+            title,
+            bpm,
+            genre,
+            year_released,  
+            album_name,
+            artist_name,
+            spotify_id: linkedSpotifyTrack?.id || null,
+          }),
       })
       const data = await res.json()
 
       if (!res.ok) throw new Error(data.error || 'Failed to add song')
 
       forms.reset()
+      setLinkedSpotifyTrack(null)
       setMessage('Song Successfully Added')
 
     } catch (err: any) {
@@ -120,19 +126,15 @@ return (
             <Form.Label className="FormLabel text-foreground mb-1">
                 BPM</Form.Label>
               <Form.Control asChild>
-                <input
-                  name="bpm"
-                  type="number"
-                  min={0}
-                  className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
-                 data-[invalid]:data-[touched]:border-destructive 
-                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
-                  required  
-                />
+                  <input
+                    name="bpm"
+                    type="number"
+                    min={0}
+                    className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
+                   data-[invalid]:data-[touched]:border-destructive 
+                   focus:data-[invalid]:data-[touched]:invalid:border-destructive"
+                  />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
-                Please enter the BPM
-              </Form.Message>
               <Form.Message match="rangeUnderflow" className="text-destructive text-sm mt-1">
                 BPM must be greater than 0
             </Form.Message>
@@ -148,12 +150,9 @@ return (
                   className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
                   data-[invalid]:data-[touched]:border-destructive 
                  focus:data-[invalid]:data-[touched]:invalid:border-destructive"
-                  required  
                 />
               </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
-                Please enter a Genre
-              </Form.Message>
+            
             </Form.Field>
 
          {/* Year Released  */}    
@@ -212,6 +211,62 @@ return (
                 Please enter an artist
               </Form.Message>
             </Form.Field>
+
+          {/* Spotify Link Section */}
+          {spotifyConnected && (
+            <Box className="mb-4 p-3 border border-border rounded-lg bg-card/50">
+              <Text as="label" size="2" weight="medium" className="text-foreground mb-2 block">
+                Link to Spotify (Optional)
+              </Text>
+              {linkedSpotifyTrack ? (
+                <Flex justify="between" align="center" gap="2">
+                  <Flex gap="2" align="center">
+                    {linkedSpotifyTrack.album?.images?.[2]?.url && (
+                      <img 
+                        src={linkedSpotifyTrack.album.images[2].url} 
+                        alt="" 
+                        className="w-10 h-10 rounded"
+                      />
+                    )}
+                    <Box>
+                      <Text size="2" weight="medium">{linkedSpotifyTrack.name}</Text>
+                      <Text size="1" color="gray">
+                        {linkedSpotifyTrack.artists?.map(a => a.name).join(', ')}
+                      </Text>
+                    </Box>
+                  </Flex>
+                  <Button 
+                    type="button" 
+                    variant="soft" 
+                    color="red" 
+                    size="1"
+                    onClick={() => setLinkedSpotifyTrack(null)}
+                  >
+                    Remove
+                  </Button>
+                </Flex>
+              ) : (
+                <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="soft" 
+                  color="green"
+                  onClick={() => setSpotifyModalOpen(true)}
+                >
+                  🎵 Link Spotify Track
+                </Button>
+                <Button
+                  type="button"
+                  variant="soft"
+                  color="green"
+                  onClick={() => setImportModalOpen(true)}
+                >
+                  ⬇️ Import from Spotify
+                </Button>
+                </div>
+              )}
+            </Box>
+          )}
           
            {/* Buttons */}
            <Flex justify="end" gap="2" mt="4">
@@ -230,7 +285,65 @@ return (
           <Text size="2" mt="3" color="blue">
             {message}
           </Text> )}
-      </Card>     
+      </Card>
+
+      {/* Spotify Link Modal */}
+      <LinkSpotifyTrackModal
+        open={spotifyModalOpen}
+        onOpenChange={setSpotifyModalOpen}
+        songTitle=""
+        currentSpotifyId={linkedSpotifyTrack?.id}
+        onLink={async (spotifyId) => {
+          // Fetch track details to store
+          const response = await fetch(`/api/spotify/tracks/${spotifyId}`, {
+            headers: { 'x-user-id': user?.id || '' },
+          })
+          if (response.ok) {
+            const track = await response.json()
+            setLinkedSpotifyTrack(track)
+          }
+        }}
+        onUnlink={async () => {
+          setLinkedSpotifyTrack(null)
+        }}
+      />
+      {/* Spotify Import Modal (pre-fill fields) */}
+      <LinkSpotifyTrackModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        songTitle=""
+        currentSpotifyId={linkedSpotifyTrack?.id}
+        onLink={async (spotifyId) => {
+          // Fetch extended track details (includes audioFeatures and genres)
+          const response = await fetch(`/api/spotify/tracks/${spotifyId}`, {
+            headers: { 'x-user-id': user?.id || '' },
+          })
+          if (!response.ok) {
+            throw new Error('Failed to fetch Spotify track')
+          }
+
+          const data = await response.json()
+
+          // Helper to set uncontrolled input values
+          const setInputValue = (name: string, value: any) => {
+            const el = document.querySelector<HTMLInputElement>(`input[name="${name}"]`)
+            if (el) el.value = value ?? ''
+          }
+
+          setInputValue('title', data.name || '')
+          setInputValue('bpm', data.bpm ?? (data.audioFeatures?.tempo ? Math.round(data.audioFeatures.tempo) : ''))
+          setInputValue('genre', data.primaryGenre ?? (data.genres && data.genres.length > 0 ? data.genres[0] : ''))
+          setInputValue('year_released', data.album?.release_date ? parseInt(data.album.release_date.split('-')[0]) : '')
+          setInputValue('album', data.album?.name || '')
+          setInputValue('artist', data.artists?.map((a: any) => a.name).join(', ') || '')
+
+          // Keep a reference to the linked Spotify track
+          setLinkedSpotifyTrack(data)
+        }}
+        onUnlink={async () => {
+          setLinkedSpotifyTrack(null)
+        }}
+      />
       </Box> 
         <Footer />
     </Box>

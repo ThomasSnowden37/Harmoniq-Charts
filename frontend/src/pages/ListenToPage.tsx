@@ -24,7 +24,7 @@ export default function ListenToLaterPage() {
         if (!user) return
         const getSongs = async() => {
             try {
-                const res = await fetch(`http://localhost:3001/api/songs/listentolist`, {
+                const res = await fetch(`/api/songs/listentolist`, {
                     headers: {
                         "x-user-id": user.id
                     },
