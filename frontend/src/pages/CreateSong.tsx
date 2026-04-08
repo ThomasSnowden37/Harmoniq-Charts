@@ -221,7 +221,7 @@ return (
               {linkedSpotifyTrack ? (
                 <Flex justify="between" align="center" gap="2">
                   <Flex gap="2" align="center">
-                    {linkedSpotifyTrack.album?.images?.[2]?.url && (
+                    {linkedSpotifyTrack.album && linkedSpotifyTrack.album.images && linkedSpotifyTrack.album.images[2] && linkedSpotifyTrack.album.images[2].url && (
                       <img 
                         src={linkedSpotifyTrack.album.images[2].url} 
                         alt="" 

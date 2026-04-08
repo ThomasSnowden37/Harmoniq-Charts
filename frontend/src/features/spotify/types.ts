@@ -60,9 +60,22 @@ export interface ImportResult {
     id: string
     name: string
   }
-  imported: number
-  skipped: number
-  skippedSongs: string[]
+  counts: {
+    found: number
+    imported: number
+    skipped: number
+  }
+  found: Array<{ title: string; songId?: string }>
+  imported: Array<{
+    title: string
+    spotify_id?: string
+    artists?: string[]
+    album?: string | null
+    year_released?: number | null
+    bpm?: number | null
+    songId?: string
+  }>
+  skipped: Array<{ title: string; reason?: string }>
 }
 
 export interface ExportResult {

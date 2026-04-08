@@ -6,10 +6,14 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "postinstall": "cd node_modules/@spotify/web-api-ts-sdk && npm run build"
+  },
+  "//dependencies": {
+    "@spotify/web-api-ts-sdk": "not using for now ^1.2.0 (using a custom fork to get updated playlist endpoints)"
   },
   "dependencies": {
-    "@spotify/web-api-ts-sdk": "^1.2.0",
+    "@spotify/web-api-ts-sdk": "github:rarandeyo/spotify-web-api-ts-sdk#feat/update-playlist-endpoints",
     "@supabase/supabase-js": "^2.39.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

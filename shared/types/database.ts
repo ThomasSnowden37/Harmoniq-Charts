@@ -366,33 +366,34 @@ export interface Database {
           spotify_profile_url?: string | null
           created_at?: string
           updated_at?: string
-      favorite_songs: {
-        Row: {
-          id: string
-          user_id: string
-          song_id: string
-          position: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          song_id: string
-          position: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          song_id?: string
-          position?: number
-          created_at?: string
+          favorite_songs: {
+            Row: {
+              id: string
+              user_id: string
+              song_id: string
+              position: number
+              created_at: string
+            }
+            Insert: {
+              id?: string
+              user_id: string
+              song_id: string
+              position: number
+              created_at?: string
+            }
+            Update: {
+              id?: string
+              user_id?: string
+              song_id?: string
+              position?: number
+              created_at?: string
+            }
+          }
         }
       }
     }
   }
 }
-
 // These are helper types for easier use
 export type Tables = Database['public']['Tables']
 export type User = Tables['users']['Row']
