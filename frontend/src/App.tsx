@@ -12,6 +12,8 @@ import RecommendResult from './pages/RecommendResult'
 import TrendingPage  from './pages/TrendingPage'
 import FeedPage  from './pages/FeedPage'
 import AllFeedPage  from './pages/AllFeedPage'
+import FAQPage from './pages/FAQPage'
+import TutorialPage from './pages/TutorialPage'
 
 // Define routes to various pages here
 function App() {
@@ -31,6 +33,8 @@ function App() {
         <Route path="/trending" element={<TrendingPage />} />
         <Route path="/feed" element={<FeedPage />} />
         <Route path="/feed/all" element={<AllFeedPage />} />
+        <Route path="/faq" element={<FAQPage />} />
+        <Route path="/tutorial" element={<TutorialPage />} />
       </Routes>
     </BrowserRouter>
   )
