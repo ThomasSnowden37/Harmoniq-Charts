@@ -450,6 +450,89 @@ router.get('/:id/listened/count', async (req, res) => {
     res.json({ total: count || 0 })
     
 })
+
+/**
+ * Get aggregated engagement details for a song
+ * Returns: { listenedCount, likeCount, average, count }
+ */
+router.get('/:id/engagement', async (req, res) => {
+    const songId = req.params.id;
+    if (!songId) return res.status(400).json({ error: 'Song ID is required' })
+
+    // ensure song exists
+    const { data: existSong, error: noSong } = await supabase
+        .from('songs')
+        .select('id')
+        .eq('id', songId)
+        .single()
+    if (noSong) {
+        return res.status(404).json({ error: 'Song is not found' })
+    }
+
+    try {
+        const [{ count: listenedCount }, { count: likeCount }, { data: ratingsData, error: ratingsError }] = await Promise.all([
+            supabase.from('listened').select('*', { count: 'exact', head: true }).eq('song_id', songId),
+            supabase.from('likes').select('*', { count: 'exact', head: true }).eq('song_id', songId),
+            supabase.from('ratings').select('rating').eq('song_id', songId),
+        ])
+
+        if (ratingsError) return res.status(500).json({ error: 'Failed to fetch ratings' })
+
+        const ratings = (ratingsData ?? []).map((r: any) => r.rating)
+        const average = ratings.length > 0 ? ratings.reduce((acc: number, r: number) => acc + r, 0) / ratings.length : null
+        const count = ratings.length
+
+        res.json({ listenedCount: listenedCount ?? 0, likeCount: likeCount ?? 0, average, count })
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Failed to fetch engagement details' })
+    }
+})
+
+/**
+ * Get user-specific status for a song (listened, listento, liked, rating)
+ */
+router.get('/:id/status', async (req, res) => {
+    const songId = req.params.id
+    const userId = req.headers['x-user-id'] as string | undefined
+
+    if (!songId) return res.status(400).json({ error: 'Song ID is required' })
+
+    const { data: existSong, error: noSong } = await supabase
+        .from('songs')
+        .select('id')
+        .eq('id', songId)
+        .single()
+    if (noSong) return res.status(404).json({ error: 'Song is not found' })
+
+    if (!userId) {
+        return res.json({ listened: false, listento: false, liked: false, rating: null })
+    }
+
+    try {
+        const [
+            { data: listenedData },
+            { data: listentoData },
+            { data: likedData },
+            { data: ratingData }
+        ] = await Promise.all([
+            supabase.from('listened').select('id').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
+            supabase.from('listento').select('id').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
+            supabase.from('likes').select('id').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
+            supabase.from('ratings').select('rating').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
+        ])
+
+        const listened = !!(listenedData && listenedData.id)
+        const listento = !!(listentoData && listentoData.id)
+        const liked = !!(likedData && likedData.id)
+        const rating = ratingData ? ratingData.rating ?? null : null
+
+        res.json({ listened, listento, liked, rating })
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Failed to fetch user status' })
+    }
+})
 /**
  * Get if listened to or not
  */

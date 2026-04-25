@@ -9,9 +9,12 @@ interface StarRatingProps {
   id: string
   showAverage?: boolean
   onAverageChange?: (avg: number | null, count?: number | null) => void
+  initialAverage?: number | null
+  initialUserRating?: number | null
+  onUserRatingChange?: (rating: number | null) => void
 }
 
-export default function RatingSong({ id, showAverage = true, onAverageChange }:StarRatingProps) {
+export default function RatingSong({ id, showAverage = true, onAverageChange, initialAverage, initialUserRating, onUserRatingChange }:StarRatingProps) {
     const { user } = useAuth()
     const [loading, setLoading] = useState(false)
     const [rating, setRating] = useState<number | null>(null)
@@ -22,30 +25,41 @@ export default function RatingSong({ id, showAverage = true, onAverageChange }:S
     const [error, setError] = useState<string | null>(null)
 
     useEffect (() => {
-        async function fetchRating() {
-            if (!user || !id) return
-            const userId = user.id
-            setLoading(false)
-            await fetchAverage()
-            try {
-                //fetch the users rating
-                const res = await fetch(`/api/ratings/${id}/ratings`, { headers: { 'x-user-id': userId } })
-                const data = await res.json()
-                if (!res.ok) {
-                    setError(data.error || 'Failed to load song rating')
-                    return
-                }
-                setRating(data.rating)
+      async function init() {
+        if (!id) return
+        setLoading(false)
 
-            } catch (err) {
-                setError('Failed to load song rating')
-                return
-            } finally {
-                setLoading(false)
-            }
+        // If parent provided the average, use it; otherwise fetch
+        if (typeof initialAverage !== 'undefined') {
+          setAverage(initialAverage)
+        } else {
+          await fetchAverage()
         }
-        fetchRating()
-    }, [id, user])
+
+        // If there's no user we can't fetch the user's rating
+        if (!user) return
+
+        // If parent provided the user's rating, use it; otherwise fetch
+        if (typeof initialUserRating !== 'undefined') {
+          setRating(initialUserRating)
+          return
+        }
+
+        try {
+          const res = await fetch(`/api/ratings/${id}/ratings`, { headers: { 'x-user-id': user.id } })
+          const data = await res.json()
+          if (!res.ok) {
+            setError(data.error || 'Failed to load song rating')
+            return
+          }
+          setRating(data.rating)
+        } catch (err) {
+          setError('Failed to load song rating')
+          return
+        }
+      }
+      init()
+    }, [id, user, initialAverage, initialUserRating])
 
     const changeRating = async (value: number) => {
         if (!user || !id) return
@@ -59,7 +73,8 @@ export default function RatingSong({ id, showAverage = true, onAverageChange }:S
             },
             body: JSON.stringify({ rating: value})
         })
-        await fetchAverage()
+      await fetchAverage()
+      if (typeof onUserRatingChange === 'function') onUserRatingChange(value)
         } catch (err) {
             setError('Failed to load song rating')
             return
@@ -77,7 +92,8 @@ export default function RatingSong({ id, showAverage = true, onAverageChange }:S
           if (res.ok) {
             setRating(null);
           }
-          await fetchAverage()
+        await fetchAverage()
+        if (typeof onUserRatingChange === 'function') onUserRatingChange(null)
         } catch (err) {
             setError('Failed to load song delete')
             return
