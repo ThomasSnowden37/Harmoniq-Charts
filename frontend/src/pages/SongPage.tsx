@@ -132,6 +132,7 @@ export default function SongPage() {
     const [reviewText, setReviewText] = useState('')
     const [reviewError, setReviewError] = useState<string | null>(null)
     const [submittingReview, setSubmittingReview] = useState(false)
+    const [userRating, setUserRating] = useState<number | null>(null)
     
 
     const MAX_CHARS = 100
@@ -161,29 +162,22 @@ export default function SongPage() {
           }
 
           setSong(data as any)
-
-          // counts / likes / reviews still come from backend endpoints
-          const countRes = await fetch(`/api/songs/${id}/listened/count`)
-          const countData = await countRes.json()
-          if (countRes.ok) setListenedCount(countData.total)
-
-          const likeRes = await fetch(`/api/likes/${id}/status`)
-          const likeData = await likeRes.json()
-          if (likeRes.ok) setLikeCount(likeData.count)
+          // aggregated engagement details (listens, likes, average rating)
+          try {
+            const engRes = await fetch(`/api/songs/${id}/engagement`)
+            if (engRes.ok) {
+              const eng = await engRes.json()
+              setListenedCount(eng.listenedCount ?? 0)
+              setLikeCount(eng.likeCount ?? 0)
+              setAverageRating(eng.average ?? null)
+              setRatingsCount(eng.count ?? 0)
+            }
+          } catch (err) {
+            console.error('Failed to load engagement details', err)
+          }
 
           const reviewsRes = await fetch(`/api/reviews/song/${id}`)
           if (reviewsRes.ok) setReviews(await reviewsRes.json())
-          // fetch average rating for display on the song card
-          try {
-            const avgRes = await fetch(`/api/ratings/${id}/average`)
-            const avgData = await avgRes.json()
-            if (avgRes.ok) {
-              setAverageRating(avgData?.average ?? null)
-              setRatingsCount(typeof avgData?.count === 'number' ? avgData.count : null)
-            }
-          } catch (err) {
-            console.error('Failed to load average rating', err)
-          }
           
         } catch (err) {
           setError('Failed to fetch song')
@@ -197,40 +191,28 @@ export default function SongPage() {
     }, [id])
 
     useEffect(() => {
-      if (!user || !id) return
+        if (!user || !id) return
 
-      const userId = user.id
+        const userId = user.id
 
-      async function fetchUserSongData() {
-      try {
-        const resLis = await fetch(
-          `/api/songs/${id}/listened`,
-          { headers: { 'x-user-id': userId } }
-        )
-        const listenedData = await resLis.json()
-        if (resLis.ok) setListened(listenedData.listened)
-
-        const toLis = await fetch(
-          `/api/songs/${id}/listento`,
-          { headers: { 'x-user-id': userId } }
-        )
-        const listentoData = await toLis.json()
-        if (toLis.ok) setListento(listentoData.listento)
-
-        const likeStatusRes = await fetch(`/api/likes/${id}/status`, {
-          headers: { 'x-user-id': userId }
-        })
-        const likeStatusData = await likeStatusRes.json()
-        if (likeStatusRes.ok) {
-          setLiked(likeStatusData.liked)
-          setLikeCount(likeStatusData.count)
+        async function fetchUserSongData() {
+          try {
+            const statusRes = await fetch(`/api/songs/${id}/status`, {
+              headers: { 'x-user-id': userId }
+            })
+            if (statusRes.ok) {
+              const statusData = await statusRes.json()
+              setListened(statusData.listened ?? false)
+              setListento(statusData.listento ?? false)
+              setLiked(statusData.liked ?? false)
+              setUserRating(statusData.rating ?? null)
+            }
+          } catch (err) {
+            console.error(err)
+          }
         }
-    } catch (err) {
-      console.error(err)
-    }
-  }
-  fetchUserSongData()
-}, [user, id])
+        fetchUserSongData()
+      }, [user, id])
 
 // Fetch Spotify cover when song becomes available.
 // Try public oEmbed first so cover can be shown even when current user
@@ -512,7 +494,14 @@ useEffect(() => {
             </div>
 
             <div className="mt-4 flex flex-col items-center">
-              <RatingSong id={song.id} showAverage={false} onAverageChange={(a, c) => { setAverageRating(a); setRatingsCount(c ?? 0); }} />
+              <RatingSong
+                id={song.id}
+                showAverage={false}
+                initialAverage={averageRating}
+                initialUserRating={userRating}
+                onAverageChange={(a, c) => { setAverageRating(a); setRatingsCount(c ?? 0); }}
+                onUserRatingChange={(r) => setUserRating(r)}
+              />
               <span className="text-xs text-muted-foreground mt-1">Rate</span>
             </div>
           </div>
