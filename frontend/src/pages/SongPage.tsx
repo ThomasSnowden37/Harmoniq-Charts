@@ -25,6 +25,77 @@ import {SpotifyIcon} from '../features/spotify/components/SpotifyConnectButton'
  * 
  */
 
+function PlaceholderCover({ title, size = 160 }: { title: string; size?: number }) {
+  const hashStr = (s: string) => {
+    let h = 0
+    for (let i = 0; i < s.length; i++) {
+      h = (h << 5) - h + s.charCodeAt(i)
+      h |= 0
+    }
+    return Math.abs(h)
+  }
+
+  const seed = hashStr(title || 'Untitled')
+  const hue = seed % 360
+  const colorBg = `hsl(${hue}, 40%, 12%)`
+  const colorAccent = `hsl(${(hue + 30) % 360}, 80%, 60%)`
+  
+  // Clean up title and grab the first 3 words
+  const titleWords = (title || 'Untitled').trim().split(/\s+/).slice(0, 3)
+  // Reverse them so word[0] is the bottom-most word near the accent line
+  const displayWords = [...titleWords].reverse()
+
+  return (
+    <svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 100 100" 
+      preserveAspectRatio="xMidYMid slice"
+      style={{ borderRadius: '6px', background: colorBg }}
+    >
+      <defs>
+        <filter id="noise">
+          <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
+          <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.12 0" />
+        </filter>
+
+        <radialGradient id="glow" cx="80%" cy="20%" r="70%">
+          <stop offset="0%" stopColor={colorAccent} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={colorAccent} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      <rect width="100" height="100" fill={colorBg} />
+      <rect width="100" height="100" fill="url(#glow)" />
+      <rect width="100" height="100" filter="url(#noise)" />
+
+      {/* Modern Typographic Layout */}
+      <g transform="translate(10, 84)">
+        {displayWords.map((word, i) => (
+          <text
+            key={i}
+            x="0"
+            y={-i * 11} // Moves upwards for each word
+            fontFamily="system-ui, -apple-system, sans-serif"
+            fontSize={word.length > 10 ? "8.5" : "10.5"}
+            fontWeight="800"
+            fill="white"
+            style={{ 
+              textTransform: 'uppercase', 
+              letterSpacing: '-0.03em',
+              opacity: 1 - (i * 0.1) // Top words fade out slightly
+            }}
+          >
+            {word}
+          </text>
+        ))}
+      </g>
+
+      <rect x="10" y="88" width="12" height="1.5" fill={colorAccent} rx="0.75" />
+    </svg>
+  )
+}
+
 interface Song {
   id: string
   title: string
@@ -220,7 +291,7 @@ useEffect(() => {
                   // cover from Spotify
                   <img src={coverUrl} alt={`${song.title} cover`} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="text-3xl font-bold text-foreground/80">{song.title.slice(0,2).toUpperCase()}</div>
+                  <PlaceholderCover title={song.title} />
                 )}
                 {song.spotify_id && (
                   <div className="absolute bottom-2 right-2 flex items-center justify-center shadow">
