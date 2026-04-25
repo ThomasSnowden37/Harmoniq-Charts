@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Button, Avatar } from '@radix-ui/themes'
+import { Button, Avatar, Box, Card, Flex, Heading, Text } from '@radix-ui/themes'
 import DeleteSongModal from '../features/songs/components/DeleteSongModal'
 import EditSongModal from '../features/songs/components/EditSongModal'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
 import { LinkSpotifyTrackModal } from '../features/spotify/components/LinkSpotifyTrackModal'
 import { useSpotify } from '../features/spotify/context/SpotifyContext'
 import RatingSong from '../features/songs/components/RatingSong'
+import { Heart, Headphones, Clock, Star, Plus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { SPOTIFY_OPEN_TRACK_URL } from '../lib/spotify'
+import { supabase } from '../lib/supabase'
+import {SpotifyIcon} from '../features/spotify/components/SpotifyConnectButton'
 
 /**
  * SongPage.tsx
@@ -23,14 +26,16 @@ import { SPOTIFY_OPEN_TRACK_URL } from '../lib/spotify'
  */
 
 interface Song {
-    id: string
-    title: string
-    bpm: number
-    genre: string
-    year_released: number
-    user_id: string
-    spotify_id?: string | null
-    album_id?: string
+  id: string
+  title: string
+  bpm?: number | null
+  genre?: string | null
+  year_released?: number | null
+  user_id?: string | null
+  spotify_id?: string | null
+  album_id?: string | null
+  albums?: { id: string; name: string } | null
+  song_artists?: Array<{ artists?: { id: string; name: string } }>
 }
 
 export default function SongPage() {
@@ -45,6 +50,9 @@ export default function SongPage() {
     const [playlistOpen, setPlaylistOpen] = useState(false)
     const [spotifyLinkOpen, setSpotifyLinkOpen] = useState(false)
     const [listenedCount, setListenedCount] = useState(0)
+    const [averageRating, setAverageRating] = useState<number | null>(null)
+    const [ratingsCount, setRatingsCount] = useState<number | null>(null)
+    const [coverUrl, setCoverUrl] = useState<string | null>(null)
     const [listened, setListened] = useState(false)
     const [listento, setListento] = useState(false)
     const [liked, setLiked] = useState(false)
@@ -53,33 +61,38 @@ export default function SongPage() {
     const [reviewText, setReviewText] = useState('')
     const [reviewError, setReviewError] = useState<string | null>(null)
     const [submittingReview, setSubmittingReview] = useState(false)
-    const [albumLoading, setAlbumLoading] = useState<'listento' | 'listened' | null>(null);
-    const [albumSuccess, setAlbumSuccess] = useState<'listento' | 'listened' | null>(null);
-    const [albumPlaylistOpen, setAlbumPlaylistOpen] = useState(false)
+    
 
     const MAX_CHARS = 100
     const userReview = reviews.find(r => r.user_id === user?.id)
 
 
     useEffect(() => {
-       if (!id) return
+      if (!id) return
 
       async function fetchSong() {
         setLoading(true)
         try {
-          const res = await fetch(`/api/songs/${id}`)
-          const data = await res.json()
+          // Fetch song with album and artist relations directly from Supabase
+          const { data, error } = await supabase
+            .from('songs')
+            .select(`
+              *,
+              albums!left (id, name),
+              song_artists ( artists ( id, name ) )
+            `)
+            .eq('id', id)
+            .single()
 
-          if (!res.ok) {
-            setError(data.error || 'Failed to load song')
+          if (error) {
+            setError('Failed to load song')
             return
           }
 
-          setSong(data)
+          setSong(data as any)
 
-          const countRes = await fetch(
-            `/api/songs/${id}/listened/count`
-          )
+          // counts / likes / reviews still come from backend endpoints
+          const countRes = await fetch(`/api/songs/${id}/listened/count`)
           const countData = await countRes.json()
           if (countRes.ok) setListenedCount(countData.total)
 
@@ -89,7 +102,18 @@ export default function SongPage() {
 
           const reviewsRes = await fetch(`/api/reviews/song/${id}`)
           if (reviewsRes.ok) setReviews(await reviewsRes.json())
-
+          // fetch average rating for display on the song card
+          try {
+            const avgRes = await fetch(`/api/ratings/${id}/average`)
+            const avgData = await avgRes.json()
+            if (avgRes.ok) {
+              setAverageRating(avgData?.average ?? null)
+              setRatingsCount(typeof avgData?.count === 'number' ? avgData.count : null)
+            }
+          } catch (err) {
+            console.error('Failed to load average rating', err)
+          }
+          
         } catch (err) {
           setError('Failed to fetch song')
           console.error(err)
@@ -137,398 +161,430 @@ export default function SongPage() {
   fetchUserSongData()
 }, [user, id])
 
-const handleAddAlbum = async (target: 'listento' | 'listened') => {
-        if (!user || !song?.album_id) return;
-        
-        setAlbumLoading(target);
-        setAlbumSuccess(null);
-
-        try {
-            const res = await fetch(`http://localhost:3001/api/songs/album/${song.album_id}/bulk-add`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-user-id': user.id
-                },
-                body: JSON.stringify({ targetTable: target })
-            });
-
-            if (res.ok) {
-                if (target === 'listento') setListento(true);
-                if (target === 'listened') setListened(true);
-                
-                setAlbumSuccess(target);
-                // Clear success message after 3 seconds
-                setTimeout(() => setAlbumSuccess(null), 3000);
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setAlbumLoading(null);
+// Fetch Spotify cover when song becomes available.
+// Try public oEmbed first so cover can be shown even when current user
+// hasn't connected Spotify. Fall back to backend (requires user token).
+useEffect(() => {
+  if (!song?.spotify_id) return
+  let cancelled = false
+  ;(async () => {
+    try {
+      const oembedUrl = `https://open.spotify.com/oembed?url=https://open.spotify.com/track/${song.spotify_id}`
+      const oeRes = await fetch(oembedUrl)
+      if (oeRes.ok) {
+        const oe = await oeRes.json()
+        const thumb = oe?.thumbnail_url || oe?.thumbnail || null
+        if (!cancelled && thumb) {
+          setCoverUrl(thumb)
+          return
         }
-  };
+      }
+    } catch (e) {
+      // ignore oembed/network errors and fallback
+    }
+
+    // Fallback: try backend route which uses a user token to fetch track details
+    if (!user) return
+    try {
+      const res = await fetch(`/api/spotify/tracks/${song.spotify_id}`, { headers: { 'x-user-id': user.id } })
+      if (!res.ok) return
+      const track = await res.json()
+      if (cancelled) return
+      const url = track?.album?.images?.[0]?.url || track?.images?.[0]?.url || null
+      if (url) setCoverUrl(url)
+    } catch (err) {
+      // ignore
+    }
+  })()
+  return () => { cancelled = true }
+}, [song?.spotify_id, user])
+
+
 
   if (loading) return <div className="min-h-screen flex flex-col"><Navbar /><main className="p-6 text-center">Loading...</main><Footer /></div>
   if (error) return <div className="min-h-screen flex flex-col bg-background"><Navbar /><main className="text-destructive p-6 text-center">{error}</main><Footer /></div>
   if (!song) return <div className="min-h-screen flex flex-col bg-background"><Navbar /><main className="text-destructive p-6 text-center">Song not found</main><Footer /></div>
 
+  const artists = song.song_artists?.map(sa => sa?.artists?.name).filter(Boolean) as string[] | undefined
+
   return (
-    <div className="min-h-screen flex flex-col">
-    <Navbar />
-    <main className='flex-1 flex flex-col items-center justify-center p-6 text-center'>
-      <h1 className="text-2xl font-bold mb-4">{song.title}</h1>
-
-      <p>BPM: {song.bpm}</p>
-      <p>Genre: {song.genre}</p>
-      <p>Year: {song.year_released}</p>
-
-      {/*  Total listeners */}
-      <p>Listeners: {listenedCount}</p>
-      <p>Likes: {likeCount}</p>
-
-      <RatingSong id = {song.id} />
-
-      {/* Spotify "Listen on Spotify" button */}
-      {song.spotify_id && (
-        <Button size="2" color="green" className="mt-4" asChild>
-          <a href={`${SPOTIFY_OPEN_TRACK_URL}${song.spotify_id}`} target="_blank" rel="noopener noreferrer">
-            🎵 Listen on Spotify
-          </a>
-        </Button>
-      )}
-
-      {/* Delete button only if user created song*/}
-      {user && user.id == song.user_id && ( //User must be logged in and created for it to show up
-        <>
-      <Button
-        size="2"
-        color="red"
-        onClick={() => setDeleteOpen(true)}
-        className="mt-6"
-      >
-        Delete Song
-      </Button>
-      {/* Edit button only if user created song*/}
-      <Button
-        size="2"
-        onClick={() => setEditOpen(true)}
-        className="mt-6"
-      >
-        Edit Song
-      </Button>
-      {/* Link to Spotify button - only if Spotify connected */}
-      {spotifyConnected && (
-        <Button
-          size="2"
-          color="green"
-          variant="soft"
-          onClick={() => setSpotifyLinkOpen(true)}
-          className="mt-6"
-        >
-          {song.spotify_id ? '🔗 Update Spotify Link' : '🎵 Link to Spotify'}
-        </Button>
-      )}
-        </>
-      )}
-
-      {/* Add to Playlist button */}
-      {user && ( //User must be logged in for it to show up
-      <Button
-        size="2"
-        color="green"
-        onClick={() => setPlaylistOpen(true)}
-        className="mt-6"
-      >
-        Add to Playlist
-      </Button>
-      )}
-      {user &&  ( //User must be logged in for it to show up
-        <>
-      <DeleteSongModal
-        isOpen={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        songId={song.id}
-        songTitle={song.title}
-        onDeleted={() => setSong(null)}
-      />
-      <EditSongModal
-        isOpen={editOpen}
-        onClose={() => setEditOpen(false)}
-        song={song}
-        onUpdated={(updated) => setSong(updated)}
-      />
-      <AddToPlaylistModal
-        isOpen={playlistOpen}
-        onClose={() => setPlaylistOpen(false)}
-        songId={song.id}
-      />
-      <LinkSpotifyTrackModal
-        open={spotifyLinkOpen}
-        onOpenChange={setSpotifyLinkOpen}
-        songTitle={song.title}
-        currentSpotifyId={song.spotify_id}
-        onLink={async (spotifyId) => {
-          const res = await fetch(`/api/songs/${song.id}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-user-id': user?.id || '',
-            },
-            body: JSON.stringify({ spotify_id: spotifyId }),
-          })
-          if (!res.ok) throw new Error('Failed to update song')
-          const updated = await res.json()
-          setSong(updated)
-        }}
-        onUnlink={async () => {
-          const res = await fetch(`/api/songs/${song.id}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-user-id': user?.id || '',
-            },
-            body: JSON.stringify({ spotify_id: null }),
-          })
-          if (!res.ok) throw new Error('Failed to update song')
-          const updated = await res.json()
-          setSong(updated)
-        }}
-      />
-      {song.album_id && (
-                <AddToPlaylistModal
-                    isOpen={albumPlaylistOpen}
-                    onClose={() => setAlbumPlaylistOpen(false)}
-                    albumId={song.album_id} 
-                />
-      )}
-      </>
-      )}
-    {user && ( //User must be logged in for it to show up
-    <>
-    <Button
-      size="2"
-      variant={listened ? 'solid' : 'soft'}
-      color={listened ? 'green' : 'gray'}
-      onClick={async () => {
-      if (!user) return alert("You must be logged in to mark as listened")
-      try {
-      const method = listened ? 'DELETE' : 'POST'
-      const res = await fetch(`/api/songs/${id}/listened`, {
-        method,
-        headers: { 'x-user-id': user.id }
-      })
-      const data = await res.json()   
-      if (res.ok) {
-        setListened(!listened)
-      } else {
-        console.error(data.error)
-      }
-    } catch (err: any) {
-      console.error(err.message)
-    }
-  }}
-  className="mt-4"
->
-    {listened ? 'Listened' : 'Mark as Listened'}
-  </Button>
-  <Button
-      size="2"
-      variant={listento ? 'solid' : 'soft'}
-      color={listento ? 'green' : 'gray'}
-      onClick={async () => {
-      if (!user) return alert("You must be logged in to mark as listen to")
-      try {
-      const method = listento? 'DELETE' : 'POST'
-      const res = await fetch(`/api/songs/${id}/listento`, {
-        method,
-        headers: { 'x-user-id': user.id }
-      })
-      const data = await res.json()   
-      if (res.ok) {
-        setListento(!listento)
-      } else {
-        console.error(data.error)
-      }
-    } catch (err: any) {
-      console.error(err.message)
-    }
-  }}
-  className="mt-4"
->
-    {listento ? 'Listen To' : 'Mark as Listen To'}
-  </Button>
-  <Button
-    size="2"
-    variant={liked ? 'solid' : 'soft'}
-    color={liked ? 'red' : 'gray'}
-    onClick={async () => {
-      try {
-        const method = liked ? 'DELETE' : 'POST'
-        const res = await fetch(`/api/likes/${id}`, {
-          method,
-          headers: { 'x-user-id': user.id }
-        })
-        if (res.ok) {
-          setLiked(!liked)
-          setLikeCount(c => liked ? c - 1 : c + 1)
-        }
-      } catch (err: any) {
-        console.error(err.message)
-      }
-    }}
-    className="mt-4"
-  >
-    {liked ? '♥ Liked' : '♡ Like'}
-  </Button>
-      </>
-  )}
-  {/* Album Actions Section */}
-  {user && song.album_id && (
-    <div className="mb-12 p-6 rounded-2xl border border-dashed border-border bg-card/50 max-w-md w-full">
-      <h3 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wider">Full Album Actions</h3>
-        <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center items-center">
-          <Button 
-            variant="outline" 
-            color={albumSuccess === 'listento' ? 'green' : 'blue'}
-            disabled={albumLoading !== null}
-            onClick={() => handleAddAlbum('listento')}
-            className="w-full sm:w-auto"
-          >
-            {albumLoading === 'listento' ? 'Adding...' : 
-            albumSuccess === 'listento' ? 'Album Added!' : 
-            '+ Album to "Listen To"'}
-          </Button>
-                            
-          <Button 
-          variant="outline" 
-          color={albumSuccess === 'listened' ? 'green' : 'indigo'}
-          disabled={albumLoading !== null}
-          onClick={() => handleAddAlbum('listened')}
-          className="w-full sm:w-auto"
-        >
-          {albumLoading === 'listened' ? 'Adding...' : 
-          albumSuccess === 'listened' ? 'Album Added!' : 
-          '+ Album to "Listened"'}
-        </Button>
-
-        <Button 
-          variant="outline" 
-          color="orange" 
-          onClick={() => setAlbumPlaylistOpen(true)}
-          className="w-full sm:w-auto"
-        >
-          + Album to Playlist
-        </Button>
-      </div>
-    </div>                                                                      
-  )}                                  
-  </main>
-
-  {/* Reviews Section */}
-  <section className="max-w-2xl mx-auto w-full px-6 pb-16">
-    <h2 className="text-xl font-bold mb-6">Reviews</h2>
-
-    {/* Review form — only shown if logged in and hasn't reviewed yet */}
-    {user && !userReview && (
-      <div className="mb-8 p-4 rounded-xl border border-border bg-card">
-        <h3 className="text-sm font-medium mb-2">Leave a Review</h3>
-        <textarea
-          value={reviewText}
-          onChange={e => { setReviewText(e.target.value); setReviewError(null) }}
-          placeholder="What did you think of this song?"
-          rows={4}
-          className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary resize-none"
-        />
-        <div className="flex items-center justify-between mt-2">
-          <span className={`text-xs ${reviewText.length >= MAX_CHARS ? 'text-destructive' : 'text-muted-foreground'}`}>
-            {reviewText.length}/{MAX_CHARS}
-          </span>
-          <div className="flex items-center gap-3">
-            {reviewError && <span className="text-xs text-destructive">{reviewError}</span>}
-            <Button
-              size="2"
-              disabled={submittingReview || !reviewText.trim()}
-              onClick={async () => {
-                if (reviewText.trim().length > MAX_CHARS) {
-                  setReviewError(`Review cannot exceed ${MAX_CHARS} characters`)
-                  return
-                }
-                setSubmittingReview(true)
-                setReviewError(null)
-                try {
-                  const res = await fetch(`/api/reviews/${id}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
-                    body: JSON.stringify({ content: reviewText.trim() }),
-                  })
-                  const data = await res.json()
-                  if (!res.ok) { setReviewError(data.error); return }
-                  setReviews(prev => [data, ...prev])
-                  setReviewText('')
-                } catch {
-                  setReviewError('Failed to submit review')
-                } finally {
-                  setSubmittingReview(false)
-                }
-              }}
-            >
-              {submittingReview ? 'Submitting...' : 'Submit'}
-            </Button>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* Review list */}
-    {reviews.length === 0 ? (
-      <p className="text-muted-foreground text-sm text-center py-8">No reviews yet. Be the first!</p>
-    ) : (
-      <div className="space-y-4">
-        {reviews.map(review => (
-          <div key={review.id} className="p-4 rounded-xl border border-border bg-card">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-3">
-                <Link to={`/user/${review.user_id}`}>
-                  <Avatar 
-                    size="2" 
-                    radius="full" 
-                    fallback={review.users?.username?.slice(0, 2).toUpperCase() || '??'} 
-                    className="hover:opacity-80 transition-opacity"
-                  />
-                </Link>
-                <Link to={`/user/${review.user_id}`} className="text-sm font-medium text-foreground hover:text-primary no-underline">
-                  {review.users.username}
-                </Link>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {new Date(review.created_at).toLocaleDateString()}
-                </span>
-                {user?.id === review.user_id && (
-                  <button
-                    className="text-xs text-destructive hover:underline cursor-pointer"
-                    onClick={async () => {
-                      const res = await fetch(`/api/reviews/${review.id}`, {
-                        method: 'DELETE',
-                        headers: { 'x-user-id': user.id },
-                      })
-                      if (res.ok) setReviews(prev => prev.filter(r => r.id !== review.id))
-                    }}
-                  >
-                    Delete
-                  </button>
+    <Box className="min-h-screen flex flex-col">
+      <Navbar />
+      <Box className="max-w-3xl mx-auto flex-1 w-full p-6">
+        <Card size="3" className="p-6">
+          <Flex gap="4" align="start">
+            {/* Left: cover image */}
+            <div className="w-40 flex-shrink-0 pr-4">
+              <div className="relative w-40 h-40 rounded-md overflow-hidden bg-muted-foreground/5 flex items-center justify-center">
+                {coverUrl ? (
+                  // cover from Spotify
+                  <img src={coverUrl} alt={`${song.title} cover`} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-3xl font-bold text-foreground/80">{song.title.slice(0,2).toUpperCase()}</div>
+                )}
+                {song.spotify_id && (
+                  <div className="absolute bottom-2 right-2 flex items-center justify-center shadow">
+                    <SpotifyIcon />
+                  </div>
                 )}
               </div>
             </div>
-            <p className="text-sm text-foreground whitespace-pre-wrap">{review.content}</p>
-          </div>
-        ))}
-      </div>
-    )}
-  </section>
+            <div className="flex-1">
+              <Heading size="7">{song.title}</Heading>
 
-  <Footer />
-    </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {artists && artists.length > 0 ? (
+                  artists.map((a, i) => (
+                    <Link key={i} to={`/search?artist=${encodeURIComponent(a)}`} className="no-underline">
+                      <div className="px-3 py-1 rounded-full bg-muted-foreground/5 text-sm hover:bg-muted-foreground/10">{a}</div>
+                    </Link>
+                  ))
+                ) : (
+                  <Text size="2" color="gray">Unknown artist</Text>
+                )}
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2 items-center">
+                {song.genre && <div className="px-3 py-1 rounded-full bg-primary/5 text-sm">{song.genre}</div>}
+                {song.bpm != null && <div className="px-3 py-1 rounded-full bg-primary/5 text-sm">{song.bpm} BPM</div>}
+                {song.year_released != null && <div className="px-3 py-1 rounded-full bg-primary/5 text-sm">{song.year_released}</div>}
+                {song.albums?.name && (
+                  <Link to={`/albums/${song.album_id}`} className="no-underline">
+                    <div className="px-3 py-1 rounded-full bg-primary/5 text-sm hover:bg-primary/10">{song.albums.name}</div>
+                  </Link>
+                )}
+              </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  {user && user.id === song.user_id && (
+                    <>
+                      <Button size="2" color="red" onClick={() => setDeleteOpen(true)}>Delete</Button>
+                      <Button size="2" onClick={() => setEditOpen(true)}>Edit</Button>
+                    </>
+                  )}
+
+                  {spotifyConnected && (
+                    <Button size="2" variant="soft" color="green" onClick={() => setSpotifyLinkOpen(true)}>
+                      {song.spotify_id ? '🔗 Update' : '🎵 Link'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Headphones className="w-5 h-5" />
+                  <span className="font-medium">{listenedCount}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Heart className="w-5 h-5 text-destructive" />
+                  <span className="font-medium">{likeCount}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">
+                    {averageRating !== null ? (
+                      <>
+                        <span>{averageRating.toFixed(1)}</span>
+                        <Star className="w-4 h-4 inline-block ml-1" />
+                      </>
+                    ) : (
+                      'No ratings'
+                    )}
+                    <span className="text-xs text-muted-foreground ml-2">({ratingsCount ?? 0})</span>
+                  </span>
+                </div>
+              </div>
+              </div>
+
+            {/* Right: Platforms */}
+            <div className="hidden md:flex md:flex-col md:items-start md:pl-4 w-28">
+              <Text size="2" color="gray">Platforms</Text>
+              <div className="mt-2 flex flex-col gap-2">
+                {song.spotify_id && (
+                  <a href={`${SPOTIFY_OPEN_TRACK_URL}${song.spotify_id}`} target="_blank" rel="noopener noreferrer" className="no-underline flex items-center gap-2">
+                    <SpotifyIcon />
+                    <span className="text-sm">Spotify</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          </Flex>
+        </Card>
+
+        {/* Per-user actions (like / listen-to / listened) — grouped and more prominent */}
+        {user && (
+          <div className="mt-6">
+            <div className="flex items-center gap-2 justify-center">
+              {/* Listen Later */}
+              <div className="w-20 flex flex-col items-center">
+                <Button
+                  size="3"
+                  variant={listento ? 'solid' : 'ghost'}
+                  color={listento ? 'green' : 'gray'}
+                  className="rounded-full w-12 h-12 flex items-center justify-center"
+                  aria-label={listento ? 'Remove from Listen To' : 'Add to Listen To'}
+                  onClick={async () => {
+                    if (!user) return alert('You must be logged in to mark as listen to')
+                    const was = listento
+                    const optimistic = !was
+                    setListento(optimistic)
+                    try {
+                      const method = optimistic ? 'POST' : 'DELETE'
+                      const res = await fetch(`/api/songs/${id}/listento`, {
+                        method,
+                        headers: { 'x-user-id': user.id }
+                      })
+                      if (!res.ok) {
+                        setListento(was)
+                        console.error('Failed to update listen-to')
+                      }
+                    } catch (err) {
+                      setListento(was)
+                      console.error(err)
+                    }
+                  }}
+                >
+                  <Clock className="w-5 h-5" />
+                </Button>
+                <span className="text-xs text-muted-foreground mt-1 h-4">Later</span>
+              </div>
+
+              {/* Listened */}
+              <div className="w-20 flex flex-col items-center">
+                <Button
+                  size="3"
+                  variant={listened ? 'solid' : 'ghost'}
+                  color={listened ? 'green' : 'gray'}
+                  className="rounded-full w-12 h-12 flex items-center justify-center"
+                  aria-label={listened ? 'Unmark listened' : 'Mark as listened'}
+                  onClick={async () => {
+                    if (!user) return alert('You must be logged in to mark as listened')
+                    const wasListened = listened
+                    const optimistic = !wasListened
+                    setListened(optimistic)
+                    setListenedCount(c => optimistic ? c + 1 : Math.max(0, c - 1))
+                    try {
+                      const method = optimistic ? 'POST' : 'DELETE'
+                      const res = await fetch(`/api/songs/${id}/listened`, {
+                        method,
+                        headers: { 'x-user-id': user.id }
+                      })
+                      if (!res.ok) {
+                        // revert
+                        setListened(wasListened)
+                        setListenedCount(c => optimistic ? Math.max(0, c - 1) : c + 1)
+                        console.error('Failed to update listened')
+                      }
+                    } catch (err) {
+                      setListened(wasListened)
+                      setListenedCount(c => optimistic ? Math.max(0, c - 1) : c + 1)
+                      console.error(err)
+                    }
+                  }}
+                >
+                  <Headphones className="w-5 h-5" />
+                </Button>
+                <span className="text-xs text-muted-foreground mt-1 h-4">Listened</span>
+              </div>
+
+              {/* Like */}
+              <div className="w-20 flex flex-col items-center">
+                <Button
+                  size="3"
+                  variant={liked ? 'solid' : 'ghost'}
+                  color={liked ? 'red' : 'gray'}
+                  className="rounded-full w-12 h-12 flex items-center justify-center"
+                  aria-label={liked ? 'Unlike' : 'Like'}
+                  onClick={async () => {
+                    if (!user) return alert('You must be logged in to like a song')
+                    const wasLiked = liked
+                    const optimistic = !wasLiked
+                    setLiked(optimistic)
+                    setLikeCount(c => optimistic ? c + 1 : Math.max(0, c - 1))
+                    try {
+                      const method = optimistic ? 'POST' : 'DELETE'
+                      const res = await fetch(`/api/likes/${id}`, {
+                        method,
+                        headers: { 'x-user-id': user.id }
+                      })
+                      if (!res.ok) {
+                        setLiked(wasLiked)
+                        setLikeCount(c => optimistic ? Math.max(0, c - 1) : c + 1)
+                        console.error('Failed to update like')
+                      }
+                    } catch (err) {
+                      setLiked(wasLiked)
+                      setLikeCount(c => optimistic ? Math.max(0, c - 1) : c + 1)
+                      console.error(err)
+                    }
+                  }}
+                >
+                  <Heart className="w-5 h-5" />
+                </Button>
+                <span className="text-xs text-muted-foreground mt-1 h-4">Like</span>
+              </div>
+              {/* Add to Playlist action */}
+              <div className="w-20 flex flex-col items-center">
+                <Button
+                  size="3"
+                  variant="ghost"
+                  color="gray"
+                  className="rounded-full w-12 h-12 flex items-center justify-center"
+                  aria-label="Add to playlist"
+                  onClick={() => setPlaylistOpen(true)}
+                >
+                  <Plus className="w-5 h-5" />
+                </Button>
+                <span className="text-xs text-muted-foreground mt-1 h-4">Playlist</span>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col items-center">
+              <RatingSong id={song.id} showAverage={false} onAverageChange={(a, c) => { setAverageRating(a); setRatingsCount(c ?? 0); }} />
+              <span className="text-xs text-muted-foreground mt-1">Rate</span>
+            </div>
+          </div>
+        )}
+
+        {/* Reviews Section */}
+        <section className="max-w-2xl mx-auto w-full px-6 pb-16 mt-6">
+          <h2 className="text-xl font-bold mb-6">Reviews</h2>
+
+          {user && !userReview && (
+            <div className="mb-8 p-4 rounded-xl border border-border bg-card">
+              <h3 className="text-sm font-medium mb-2">Leave a Review</h3>
+              <textarea
+                value={reviewText}
+                onChange={e => { setReviewText(e.target.value); setReviewError(null) }}
+                placeholder="What did you think of this song?"
+                rows={4}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary resize-none"
+              />
+              <div className="flex items-center justify-between mt-2">
+                <span className={`text-xs ${reviewText.length >= MAX_CHARS ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {reviewText.length}/{MAX_CHARS}
+                </span>
+                <div className="flex items-center gap-3">
+                  {reviewError && <span className="text-xs text-destructive">{reviewError}</span>}
+                  <Button
+                    size="2"
+                    disabled={submittingReview || !reviewText.trim()}
+                    onClick={async () => {
+                      if (reviewText.trim().length > MAX_CHARS) {
+                        setReviewError(`Review cannot exceed ${MAX_CHARS} characters`)
+                        return
+                      }
+                      setSubmittingReview(true)
+                      setReviewError(null)
+                      try {
+                        const res = await fetch(`/api/reviews/${id}`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+                          body: JSON.stringify({ content: reviewText.trim() }),
+                        })
+                        const data = await res.json()
+                        if (!res.ok) { setReviewError(data.error); return }
+                        setReviews(prev => [data, ...prev])
+                        setReviewText('')
+                      } catch {
+                        setReviewError('Failed to submit review')
+                      } finally {
+                        setSubmittingReview(false)
+                      }
+                    }}
+                  >
+                    {submittingReview ? 'Submitting...' : 'Submit'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {reviews.length === 0 ? (
+            <p className="text-muted-foreground text-sm text-center py-8">No reviews yet. Be the first!</p>
+          ) : (
+            <div className="space-y-4">
+              {reviews.map(review => (
+                <div key={review.id} className="p-4 rounded-xl border border-border bg-card">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <Link to={`/user/${review.user_id}`}>
+                        <Avatar 
+                          size="2" 
+                          radius="full" 
+                          fallback={review.users?.username?.slice(0, 2).toUpperCase() || '??'} 
+                          className="hover:opacity-80 transition-opacity"
+                        />
+                      </Link>
+                      <Link to={`/user/${review.user_id}`} className="text-sm font-medium text-foreground hover:text-primary no-underline">
+                        {review.users.username}
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(review.created_at).toLocaleDateString()}
+                      </span>
+                      {user?.id === review.user_id && (
+                        <button
+                          className="text-xs text-destructive hover:underline cursor-pointer"
+                          onClick={async () => {
+                            const res = await fetch(`/api/reviews/${review.id}`, {
+                              method: 'DELETE',
+                              headers: { 'x-user-id': user.id },
+                            })
+                            if (res.ok) setReviews(prev => prev.filter(r => r.id !== review.id))
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{review.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Hidden modals kept intact */}
+        {user && (
+          <>
+            <DeleteSongModal isOpen={deleteOpen} onClose={() => setDeleteOpen(false)} songId={song.id} songTitle={song.title} onDeleted={() => setSong(null)} />
+            <EditSongModal isOpen={editOpen} onClose={() => setEditOpen(false)} song={song} onUpdated={(updated) => setSong(updated)} />
+            <AddToPlaylistModal isOpen={playlistOpen} onClose={() => setPlaylistOpen(false)} songId={song.id} />
+            <LinkSpotifyTrackModal open={spotifyLinkOpen} onOpenChange={setSpotifyLinkOpen} songTitle={song.title} currentSpotifyId={song.spotify_id} onLink={async (spotifyId) => {
+              const res = await fetch(`/api/songs/${song.id}`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-user-id': user?.id || '',
+                },
+                body: JSON.stringify({ spotify_id: spotifyId }),
+              })
+              if (!res.ok) throw new Error('Failed to update song')
+              const updated = await res.json()
+              setSong(updated)
+            }} onUnlink={async () => {
+              const res = await fetch(`/api/songs/${song.id}`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-user-id': user?.id || '',
+                },
+                body: JSON.stringify({ spotify_id: null }),
+              })
+              if (!res.ok) throw new Error('Failed to update song')
+              const updated = await res.json()
+              setSong(updated)
+            }} />
+            
+          </>
+        )}
+      </Box>
+      <Footer />
+    </Box>
   )
 }
 

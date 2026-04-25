@@ -117,12 +117,10 @@ router.get('/:id/average', async (req, res) => {
     }
 
     const ratings = data?.map(r => r.rating) ?? []
-    const average =
-        ratings.length > 0
-        ? ratings.reduce((acc, r) => acc + r, 0) / ratings.length
-        : null
-    console.log({ average })
-    res.json({ average })
+    const average = ratings.length > 0 ? ratings.reduce((acc, r) => acc + r, 0) / ratings.length : null
+    const count = ratings.length
+    console.log({ average, count })
+    res.json({ average, count })
 })
 
 

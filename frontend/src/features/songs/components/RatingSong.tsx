@@ -7,9 +7,11 @@ import { useAuth } from '../../../context/AuthContext'
 
 interface StarRatingProps {
   id: string
+  showAverage?: boolean
+  onAverageChange?: (avg: number | null, count?: number | null) => void
 }
 
-export default function RatingSong({ id }:StarRatingProps) {
+export default function RatingSong({ id, showAverage = true, onAverageChange }:StarRatingProps) {
     const { user } = useAuth()
     const [loading, setLoading] = useState(false)
     const [rating, setRating] = useState<number | null>(null)
@@ -27,10 +29,7 @@ export default function RatingSong({ id }:StarRatingProps) {
             await fetchAverage()
             try {
                 //fetch the users rating
-                const res = await fetch(
-                `http://localhost:3001/api/ratings/${id}/ratings`,
-                { headers: { 'x-user-id': userId } 
-                })
+                const res = await fetch(`/api/ratings/${id}/ratings`, { headers: { 'x-user-id': userId } })
                 const data = await res.json()
                 if (!res.ok) {
                     setError(data.error || 'Failed to load song rating')
@@ -52,7 +51,7 @@ export default function RatingSong({ id }:StarRatingProps) {
         if (!user || !id) return
         setRating(value)
         try {
-            await fetch(`http://localhost:3001/api/ratings/${id}/rate`, {
+            await fetch(`/api/ratings/${id}/rate`, {
             method: 'POST',
             headers: {
             'Content-Type': 'application/json',
@@ -69,7 +68,7 @@ export default function RatingSong({ id }:StarRatingProps) {
     const deleteRating = async () => {
         if (!user || !id) return
         try {
-            const res = await fetch(`http://localhost:3001/api/ratings/${id}/remove`, {
+            const res = await fetch(`/api/ratings/${id}/remove`, {
             method: 'DELETE',
             headers: {
             'x-user-id': user.id
@@ -87,7 +86,7 @@ export default function RatingSong({ id }:StarRatingProps) {
     const fetchAverage = async () => {
       if (!id) return
       try {
-        const res = await fetch(`http://localhost:3001/api/ratings/${id}/average`)
+        const res = await fetch(`/api/ratings/${id}/average`)
         const data = await res.json()
 
         if (!res.ok) {
@@ -95,7 +94,10 @@ export default function RatingSong({ id }:StarRatingProps) {
           return
         }
 
-        setAverage(data?.average ?? null)
+        const avg = data?.average ?? null
+        const count = typeof data?.count === 'number' ? data.count : null
+        setAverage(avg)
+        if (typeof onAverageChange === 'function') onAverageChange(avg, count)
       } catch (err) {
         setError('Failed to load average')
       }
@@ -156,7 +158,7 @@ export default function RatingSong({ id }:StarRatingProps) {
               top: 0,
               left: 0,
               width: fill * 100 + '%',
-              color: '#e7e300',
+              color: '#3BA2FF',
             }}
           >
             ★
@@ -182,11 +184,11 @@ export default function RatingSong({ id }:StarRatingProps) {
     </button>
   )}
   </div>
-    <div style={{ fontSize: '35px', color: '#666' }}>
-      {average !== null
-        ? `${average.toFixed(1)} ★`
-        : 'No ratings'}
-    </div>
+    {showAverage && (
+      <div style={{ fontSize: '22px', color: '#666' }}>
+        {average !== null ? `${average.toFixed(1)} ★` : 'No ratings'}
+      </div>
+    )}
 
 </div>
   )
