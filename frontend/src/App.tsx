@@ -7,6 +7,7 @@ import SearchPage from "./pages/SearchPage"
 import RecommendPage from './pages/RecommendPage'
 import UserSearchPage from './pages/UserSearchPage'
 import PlaylistPage from './pages/PlaylistPage'
+import AlbumPage from './pages/AlbumPage'
 import ListenToPage  from './pages/ListenToPage'
 import RecommendResult from './pages/RecommendResult'
 import TrendingPage  from './pages/TrendingPage'
@@ -29,6 +30,7 @@ function App() {
         <Route path="/recommend" element={<RecommendPage />} />
         <Route path="/recommend/:id" element={<RecommendResult />} />
         <Route path="/playlists/:playlistId" element={<PlaylistPage />} />
+        <Route path="/albums/:albumId" element={<AlbumPage />} />
         <Route path="/songs/listento" element={<ListenToPage />} />
         <Route path="/trending" element={<TrendingPage />} />
         <Route path="/feed" element={<FeedPage />} />
