@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(finalUser);
           setRealUserId(finalUser.id); 
 
-          window.location.reload();
+          window.location.href = '/feed';
         }
       } catch (err) {
         console.error("Backend sync failed", err);

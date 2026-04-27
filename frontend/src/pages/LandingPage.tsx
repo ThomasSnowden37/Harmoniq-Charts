@@ -1,9 +1,6 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Text, Heading, Card } from '@radix-ui/themes'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { useAuth } from '../context/AuthContext'
 
 const ALBUM_COVERS = [
   { title: 'Midnight Drive', colors: 'from-purple-400 to-indigo-600' },
@@ -74,13 +71,6 @@ function CarouselRow({
 }
 
 export default function LandingPage() {
-  const { user } = useAuth()
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    if (user) navigate('/feed', { replace: true })
-  }, [user, navigate])
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
