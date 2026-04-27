@@ -15,6 +15,7 @@ import ratingsRouter from './routes/ratings.js'
 import trendingRouter from './routes/trending.js'
 import favoriteSongsRouter from './routes/favoriteSongs.js'
 import feedRouter from './routes/feed.js'
+import topAlbumsRouter from './routes/topAlbums.js'
 
 dotenv.config()
 
@@ -37,6 +38,7 @@ app.use('/api/ratings', ratingsRouter)
 app.use('/api/trending', trendingRouter)
 app.use('/api/favorite-songs', favoriteSongsRouter)
 app.use('/api/feed', feedRouter)
+app.use('/api/top-albums', topAlbumsRouter)
 
 // Test the supabase connection with this endpoint
 app.get('/api/test-db', async (req, res) => {
