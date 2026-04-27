@@ -1,8 +1,16 @@
+import { useState, useEffect } from 'react'
 import { Text, Heading, Card } from '@radix-ui/themes'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 
-const ALBUM_COVERS = [
+interface AlbumItem {
+  title: string
+  artist?: string
+  imageUrl?: string
+  colors?: string
+}
+
+const FALLBACK_ROW1: AlbumItem[] = [
   { title: 'Midnight Drive', colors: 'from-purple-400 to-indigo-600' },
   { title: 'Golden Hour', colors: 'from-amber-300 to-orange-500' },
   { title: 'Ocean Waves', colors: 'from-cyan-300 to-blue-500' },
@@ -17,7 +25,7 @@ const ALBUM_COVERS = [
   { title: 'Warm Embrace', colors: 'from-orange-300 to-rose-500' },
 ]
 
-const ALBUM_COVERS_ROW2 = [
+const FALLBACK_ROW2: AlbumItem[] = [
   { title: 'Velvet Sky', colors: 'from-fuchsia-300 to-pink-600' },
   { title: 'Deep Blue', colors: 'from-blue-400 to-indigo-700' },
   { title: 'Wildflower', colors: 'from-lime-300 to-emerald-500' },
@@ -32,29 +40,31 @@ const ALBUM_COVERS_ROW2 = [
   { title: 'Aurora', colors: 'from-green-300 to-blue-500' },
 ]
 
-function AlbumCover({ title, colors }: { title: string; colors: string }) {
+function AlbumCover({ title, artist, imageUrl, colors }: AlbumItem) {
   return (
     <div className="flex-shrink-0 w-36 h-36 md:w-44 md:h-44 mx-3">
-      <div
-        className={`w-full h-full rounded-xl bg-gradient-to-br ${colors} shadow-lg flex items-end p-3`}
-      >
-        <span className="text-white text-xs font-semibold drop-shadow-md truncate">
-          {title}
-        </span>
-      </div>
+      {imageUrl ? (
+        <div className="relative w-full h-full rounded-xl overflow-hidden shadow-lg group">
+          <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors rounded-xl" />
+          <div className="absolute bottom-0 left-0 right-0 p-2 translate-y-full group-hover:translate-y-0 transition-transform">
+            <p className="text-white text-xs font-semibold truncate drop-shadow-md">{title}</p>
+            {artist && <p className="text-white/80 text-xs truncate drop-shadow-md">{artist}</p>}
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`w-full h-full rounded-xl bg-gradient-to-br ${colors} shadow-lg flex items-end p-3`}
+        >
+          <span className="text-white text-xs font-semibold drop-shadow-md truncate">{title}</span>
+        </div>
+      )}
     </div>
   )
 }
 
-function CarouselRow({
-  albums,
-  direction,
-}: {
-  albums: typeof ALBUM_COVERS
-  direction: 'left' | 'right'
-}) {
-  const animationClass =
-    direction === 'left' ? 'animate-scroll-left' : 'animate-scroll-right'
+function CarouselRow({ albums, direction }: { albums: AlbumItem[]; direction: 'left' | 'right' }) {
+  const animationClass = direction === 'left' ? 'animate-scroll-left' : 'animate-scroll-right'
 
   return (
     <div className="overflow-hidden py-3">
@@ -71,6 +81,19 @@ function CarouselRow({
 }
 
 export default function LandingPage() {
+  const [row1, setRow1] = useState<AlbumItem[]>(FALLBACK_ROW1)
+  const [row2, setRow2] = useState<AlbumItem[]>(FALLBACK_ROW2)
+
+  useEffect(() => {
+    fetch('/api/top-albums')
+      .then(res => res.json())
+      .then((albums: AlbumItem[]) => {
+        setRow1(albums.slice(0, 13))
+        setRow2(albums.slice(13))
+      })
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -89,8 +112,8 @@ export default function LandingPage() {
 
         {/* Carousel */}
         <div className="pt-4 pb-12">
-          <CarouselRow albums={ALBUM_COVERS} direction="left" />
-          <CarouselRow albums={ALBUM_COVERS_ROW2} direction="right" />
+          <CarouselRow albums={row1} direction="left" />
+          <CarouselRow albums={row2} direction="right" />
         </div>
       </section>
 
