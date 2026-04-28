@@ -96,10 +96,6 @@ export default function UserSearchPage() {
                     <div className="text-lg text-primary">
                         {user.username}
                     </div>
-
-                    <div className="text-sm text-muted-foreground">
-                        {user.email}
-                    </div>
                     </div>
 
                     <Button
