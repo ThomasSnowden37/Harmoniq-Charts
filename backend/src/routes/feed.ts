@@ -317,9 +317,64 @@ router.get('/reviews', async (req, res) => {
         }
     })) || []
     res.json(friendRev)
+})
+/**
+ * Get recent friend playlists 
+ */
+router.get('/playlists', async (req, res) => {
+    const userId = req.headers['x-user-id'] as string
 
+    if (!userId) {
+        return res.status(401).json({error: 'Not logged in'})
+    }
+    // get the users friends
+    const { data: friends, error: friends_error } = await supabase
+        .from('friend_requests')
+        .select('requester_id, addressee_id') 
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
+    
+    if (friends_error) {
+        return res.status(500).json({ error: 'Failed to get friends' })
+    }
 
+    const friendsId =  friends.map(f =>
+        f.requester_id == userId ? f.addressee_id : f.requester_id
+    )
 
+    if (friendsId.length == 0) {
+        return (res.json([]))
+    }
+
+    const { data: playlists, error: playlists_error } = await supabase
+        .from('playlists')
+        .select('id, user_id, name, created_at')
+            .in('user_id', friendsId)
+            .order('created_at', { ascending : false})
+            .limit(8)
+
+    if (playlists_error) {
+        return res.status(500).json({ error: 'Failed to get friends playlist' })
+    }
+
+    const userIds = playlists.map(r => r.user_id)
+
+    const { data: users } = await supabase
+        .from('users')
+        .select('id, username')
+        .in('id', userIds)
+
+    
+    const userData = new Map(users?.map(u => [u.id, u.username]))
+
+    const friendRev = playlists.map(playlist => ({
+        id: playlist.id,
+        name: playlist.name,
+        created_at: playlist.created_at,
+        user_id: playlist.user_id,
+        friend_name: userData.get(playlist.user_id) || 'No Name',
+    })) || []
+    res.json(friendRev)
 })
 
 export default router
