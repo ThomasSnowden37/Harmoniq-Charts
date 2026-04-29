@@ -131,6 +131,15 @@ interface friendPlaylist {
     friend_name: string
 }
 
+interface trendingPlaylist {
+    id: string
+    name: string
+    created_at: string
+    user_id: string
+    trending_score: number
+    username: string
+}
+
 export default function FeedSongs() {
     const [loading, setLoading] = useState(true)
     const [feed, setFeed] = useState<Feeds[]>([])
@@ -138,6 +147,7 @@ export default function FeedSongs() {
     const [trending, setTrending] = useState<Trendsong[]>([])
     const [friendReviews, setfriendReviews] = useState<songReview[]>([])
     const [friendPlaylists, setfriendPlaylists] = useState<friendPlaylist[]>([])
+    const [trendingPlaylist, setTrendingPlaylist] = useState<trendingPlaylist[]>([])
     const { user } = useAuth()
   
     const navigate = useNavigate();
@@ -194,6 +204,19 @@ useEffect(() => {
             return
         }
         setfriendPlaylists(fplayData)
+
+        const trendingPaly = await fetch(`http://localhost:3001/api/trending/playlists`, {
+            headers: {
+                "x-user-id": user.id
+            }
+        })
+        const trendingPData = await trendingPaly.json()
+        if (!trendingPaly.ok) {
+            setError(trendingPData.error || 'Failed to load trending Playlists')
+            return
+        }
+        setTrendingPlaylist(trendingPData)
+
         } catch (err) {
             console.error(err)
             setError('Failed to fetch friends songs')
@@ -404,6 +427,50 @@ useEffect(() => {
                     </div>
                 </div>
                 )}
+                {/* Trending Playlists */}
+                <div className="w-full flex justify-center mt-16 mb-4">
+                    <h1 className="text-3xl font-semibold text-primary text-center">
+                        Trending Playlists
+                    </h1>
+                </div>
+
+                {!loading && trendingPlaylist.length === 0 && (
+                    <p className="text-muted-foreground">No trending playlists.</p>
+                )}
+                {!loading && trendingPlaylist.length > 0 && (
+                <div className="w-full max-w-7xl overflow-visible">
+                    <div className="flex justify-center gap-4">
+                        <div className="flex gap-6">
+                            {trendingPlaylist.slice(0, 8).map(playlist => (
+                            <a
+                                key={playlist.id}
+                                href={`/playlists/${playlist.id}`}
+                                className="w-36 flex-shrink-0 no-underline"
+                            >
+                                <div className="w-36 h-44 rounded-lg border border-border bg-card mb-2 flex items-center justify-center">
+                                    <PlaceholderCover title={playlist.name} size={132} />
+                                </div>
+
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                    <a
+                                        href={`/user/${playlist.user_id}`}
+                                        className="font-semibold text-primary underline"
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        {playlist.username}
+                                    </a>
+                                </div>
+
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                    {new Date(playlist.created_at).toLocaleDateString()}
+                                </div>
+                            </a>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                )}
+
 
                 {error && <p className="text-red-500 mt-4">{error}</p>}
             </div>

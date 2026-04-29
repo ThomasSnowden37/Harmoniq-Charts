@@ -246,6 +246,7 @@ export interface Database {
           is_pinned: boolean
           created_at: string
           spotify_playlist_id: string | null
+          trending_score: number | null
         }
         Insert: {
           id?: string
@@ -254,6 +255,7 @@ export interface Database {
           is_pinned?: boolean
           created_at?: string
           spotify_playlist_id?: string | null
+          trending_score: number | null
         }
         Update: {
           id?: string
@@ -262,6 +264,7 @@ export interface Database {
           is_pinned?: boolean
           created_at?: string
           spotify_playlist_id?: string | null
+          trending_score: number | null
         }
       }
       playlist_songs: {

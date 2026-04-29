@@ -482,6 +482,7 @@ router.post('/:id/likes', async (req, res) => {
     }
     return res.status(500).json({ error: error.message })
   }
+  const { data: trend, error: trend_error } = await supabase.rpc('get_trending_playlists');
   res.status(201).json(data)
 })
 
@@ -501,6 +502,7 @@ router.delete('/:id/likes', async (req, res) => {
     .eq('user_id', userId)
 
   if (error) return res.status(500).json({ error: error.message })
+  const { data: trend, error: trend_error } = await supabase.rpc('get_trending_playlists');
   res.json({ message: 'Like removed' })
 })
 

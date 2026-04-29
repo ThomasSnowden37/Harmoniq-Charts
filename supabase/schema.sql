@@ -104,6 +104,7 @@ CREATE TABLE playlists (
     is_pinned BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     spotify_playlist_id VARCHAR(50)
+    trending_score NUMERIC DEFAULT 0,
 );
 
 CREATE TABLE playlist_songs (
