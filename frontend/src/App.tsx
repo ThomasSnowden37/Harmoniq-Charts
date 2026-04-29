@@ -8,6 +8,7 @@ import RecommendPage from './pages/RecommendPage'
 import UserSearchPage from './pages/UserSearchPage'
 import PlaylistPage from './pages/PlaylistPage'
 import AlbumPage from './pages/AlbumPage'
+import ArtistPage from './pages/ArtistPage'
 import ListenToPage  from './pages/ListenToPage'
 import RecommendResult from './pages/RecommendResult'
 import TrendingPage  from './pages/TrendingPage'
@@ -15,6 +16,8 @@ import FeedPage  from './pages/FeedPage'
 import AllFeedPage  from './pages/AllFeedPage'
 import FAQPage from './pages/FAQPage'
 import TutorialPage from './pages/TutorialPage'
+import ContributionsPage from './pages/ContributionsPage'
+import AdminProposalsPage from './pages/AdminProposalsPage'
 
 // Define routes to various pages here
 function App() {
@@ -31,10 +34,13 @@ function App() {
         <Route path="/recommend/:id" element={<RecommendResult />} />
         <Route path="/playlists/:playlistId" element={<PlaylistPage />} />
         <Route path="/albums/:albumId" element={<AlbumPage />} />
+        <Route path="/artists/:artistId" element={<ArtistPage />} />
         <Route path="/songs/listento" element={<ListenToPage />} />
         <Route path="/trending" element={<TrendingPage />} />
         <Route path="/feed" element={<FeedPage />} />
         <Route path="/feed/all" element={<AllFeedPage />} />
+        <Route path="/contributions" element={<ContributionsPage />} />
+        <Route path="/admin/proposals" element={<AdminProposalsPage />} />
         <Route path="/faq" element={<FAQPage />} />
         <Route path="/tutorial" element={<TutorialPage />} />
       </Routes>

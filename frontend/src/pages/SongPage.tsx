@@ -1,19 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Button, Avatar, Box, Card, Flex, Heading, Text } from '@radix-ui/themes'
-import DeleteSongModal from '../features/songs/components/DeleteSongModal'
-import EditSongModal from '../features/songs/components/EditSongModal'
+import { Button, Avatar, Box, Card, Dialog, Flex, Heading, Text } from '@radix-ui/themes'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
-import { LinkSpotifyTrackModal } from '../features/spotify/components/LinkSpotifyTrackModal'
-import { useSpotify } from '../features/spotify/context/SpotifyContext'
 import RatingSong from '../features/songs/components/RatingSong'
-import { Heart, Headphones, Clock, Star, Plus } from 'lucide-react'
+import { Heart, Headphones, Clock, Star, Plus, GitMerge, PencilLine, ScrollText, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { SPOTIFY_OPEN_TRACK_URL } from '../lib/spotify'
 import { supabase } from '../lib/supabase'
 import {SpotifyIcon} from '../features/spotify/components/SpotifyConnectButton'
+import SongSuggestionModal from '../features/proposals/components/SongProposalModal'
+import MergeProposalModal from '../features/proposals/components/MergeSongsProposalModal'
 
 /**
  * SongPage.tsx
@@ -41,7 +39,7 @@ function PlaceholderCover({ title, size = 160 }: { title: string; size?: number 
   const colorAccent = `hsl(${(hue + 30) % 360}, 80%, 60%)`
   
   // Clean up title and grab the first 3 words
-  const titleWords = (title || 'Untitled').trim().split(/\s+/).slice(0, 3)
+  const titleWords = (title || 'Untitled').trim().split(/\s+/)
   // Reverse them so word[0] is the bottom-most word near the accent line
   const displayWords = [...titleWords].reverse()
 
@@ -102,24 +100,65 @@ interface Song {
   bpm?: number | null
   genre?: string | null
   year_released?: number | null
+  duration_ms?: number | null
+  spotify_import?: boolean
   user_id?: string | null
   spotify_id?: string | null
   album_id?: string | null
   albums?: { id: string; name: string } | null
   song_artists?: Array<{ artists?: { id: string; name: string } }>
+  song_credits?: Array<{
+    role?: string | null
+    artist_id?: string | null
+    artist_name?: string | null
+    artists?: { id?: string; name: string } | Array<{ id?: string; name: string }> | null
+  }>
+}
+
+type NormalizedSongCredit = {
+  artistId: string | null
+  artistName: string | null
+  role: string | null
+}
+
+function normalizeSongCredits(song: Song | null): NormalizedSongCredit[] {
+  return (song?.song_credits ?? [])
+    .map((credit) => {
+      const relatedArtist = Array.isArray(credit.artists)
+        ? credit.artists[0]
+        : credit.artists
+
+      const artistName = relatedArtist?.name?.trim() || credit.artist_name?.trim() || null
+      const role = credit.role?.trim() || null
+
+      if (!artistName && !role) {
+        return null
+      }
+
+      return {
+        artistId: relatedArtist?.id ?? credit.artist_id ?? null,
+        artistName,
+        role,
+      }
+    })
+    .filter((credit): credit is NormalizedSongCredit => Boolean(credit))
+    .sort((left, right) => {
+      const roleCompare = String(left.role ?? '').localeCompare(String(right.role ?? ''))
+      if (roleCompare !== 0) return roleCompare
+      return String(left.artistName ?? '').localeCompare(String(right.artistName ?? ''))
+    })
 }
 
 export default function SongPage() {
     const { user } = useAuth()
-    const { isConnected: spotifyConnected } = useSpotify()
     const { id } = useParams()
     const [loading, setLoading] = useState(true)
     const [song, setSong] = useState<Song | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [deleteOpen, setDeleteOpen] = useState(false)
-    const [editOpen, setEditOpen] = useState(false)
+    const [suggestionOpen, setSuggestionOpen] = useState(false)
+    const [mergeOpen, setMergeOpen] = useState(false)
     const [playlistOpen, setPlaylistOpen] = useState(false)
-    const [spotifyLinkOpen, setSpotifyLinkOpen] = useState(false)
+    const [creditsOpen, setCreditsOpen] = useState(false)
     const [listenedCount, setListenedCount] = useState(0)
     const [averageRating, setAverageRating] = useState<number | null>(null)
     const [ratingsCount, setRatingsCount] = useState<number | null>(null)
@@ -161,7 +200,22 @@ export default function SongPage() {
             return
           }
 
-          setSong(data as any)
+          let creditsData: Song['song_credits'] = []
+          try {
+            const creditsRes = await fetch(`/api/songs/${id}/credits`)
+            if (!creditsRes.ok) {
+              throw new Error('Failed to load song credits')
+            }
+
+            creditsData = await creditsRes.json()
+          } catch (creditsError) {
+            console.error('Failed to load song credits', creditsError)
+          }
+
+          setSong({
+            ...(data as any),
+            song_credits: creditsData ?? [],
+          })
           // aggregated engagement details (listens, likes, average rating)
           try {
             const engRes = await fetch(`/api/songs/${id}/engagement`)
@@ -235,19 +289,6 @@ useEffect(() => {
     } catch (e) {
       // ignore oembed/network errors and fallback
     }
-
-    // Fallback: try backend route which uses a user token to fetch track details
-    if (!user) return
-    try {
-      const res = await fetch(`/api/spotify/tracks/${song.spotify_id}`, { headers: { 'x-user-id': user.id } })
-      if (!res.ok) return
-      const track = await res.json()
-      if (cancelled) return
-      const url = track?.album?.images?.[0]?.url || track?.images?.[0]?.url || null
-      if (url) setCoverUrl(url)
-    } catch (err) {
-      // ignore
-    }
   })()
   return () => { cancelled = true }
 }, [song?.spotify_id, user])
@@ -258,7 +299,8 @@ useEffect(() => {
   if (error) return <div className="min-h-screen flex flex-col bg-background"><Navbar /><main className="text-destructive p-6 text-center">{error}</main><Footer /></div>
   if (!song) return <div className="min-h-screen flex flex-col bg-background"><Navbar /><main className="text-destructive p-6 text-center">Song not found</main><Footer /></div>
 
-  const artists = song.song_artists?.map(sa => sa?.artists?.name).filter(Boolean) as string[] | undefined
+  const artists = song.song_artists?.map((entry) => entry?.artists).filter(Boolean) as Array<{ id: string; name: string }> | undefined
+  const credits = normalizeSongCredits(song)
 
   return (
     <Box className="min-h-screen flex flex-col">
@@ -266,11 +308,9 @@ useEffect(() => {
       <Box className="max-w-3xl mx-auto flex-1 w-full p-6">
         <Card size="3" className="p-6">
           <Flex gap="4" align="start">
-            {/* Left: cover image */}
             <div className="w-40 flex-shrink-0 pr-4">
               <div className="relative w-40 h-40 rounded-md overflow-hidden bg-muted-foreground/5 flex items-center justify-center">
                 {coverUrl ? (
-                  // cover from Spotify
                   <img src={coverUrl} alt={`${song.title} cover`} className="w-full h-full object-cover" />
                 ) : (
                   <PlaceholderCover title={song.title} />
@@ -283,13 +323,41 @@ useEffect(() => {
               </div>
             </div>
             <div className="flex-1">
-              <Heading size="7">{song.title}</Heading>
+              <Flex justify="between" align="start" gap="3">
+                <Heading size="7">{song.title}</Heading>
+                {user && (
+                  <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background/70 p-1 shadow-sm">
+                    <Button
+                      size="1"
+                      variant="ghost"
+                      color="gray"
+                      onClick={() => setSuggestionOpen(true)}
+                      title="Suggest an edit"
+                      aria-label="Suggest an edit"
+                      className="rounded-full"
+                    >
+                      <PencilLine className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="1"
+                      variant="ghost"
+                      color="gray"
+                      onClick={() => setMergeOpen(true)}
+                      title="Suggest a merge"
+                      aria-label="Suggest a merge"
+                      className="rounded-full"
+                    >
+                      <GitMerge className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </Flex>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {artists && artists.length > 0 ? (
-                  artists.map((a, i) => (
-                    <Link key={i} to={`/search?artist=${encodeURIComponent(a)}`} className="no-underline">
-                      <div className="px-3 py-1 rounded-full bg-muted-foreground/5 text-sm hover:bg-muted-foreground/10">{a}</div>
+                  artists.map((artist) => (
+                    <Link key={artist.id} to={`/artists/${artist.id}`} className="no-underline">
+                      <div className="px-3 py-1 rounded-full bg-muted-foreground/5 text-sm hover:bg-muted-foreground/10">{artist.name}</div>
                     </Link>
                   ))
                 ) : (
@@ -306,23 +374,11 @@ useEffect(() => {
                     <div className="px-3 py-1 rounded-full bg-primary/5 text-sm hover:bg-primary/10">{song.albums.name}</div>
                   </Link>
                 )}
-              </div>
-
-              <div className="mt-4 flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  {user && user.id === song.user_id && (
-                    <>
-                      <Button size="2" color="red" onClick={() => setDeleteOpen(true)}>Delete</Button>
-                      <Button size="2" onClick={() => setEditOpen(true)}>Edit</Button>
-                    </>
-                  )}
-
-                  {spotifyConnected && (
-                    <Button size="2" variant="soft" color="green" onClick={() => setSpotifyLinkOpen(true)}>
-                      {song.spotify_id ? '🔗 Update' : '🎵 Link'}
-                    </Button>
-                  )}
-                </div>
+                <Button size="1" variant="soft" color="gray" onClick={() => setCreditsOpen(true)}>
+                  <ScrollText className="w-4 h-4" />
+                  Credits
+                  {credits.length > 0 ? ` (${credits.length})` : ''}
+                </Button>
               </div>
 
               <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
@@ -350,7 +406,6 @@ useEffect(() => {
               </div>
               </div>
 
-            {/* Right: Platforms */}
             <div className="hidden md:flex md:flex-col md:items-start md:pl-4 w-28">
               <Text size="2" color="gray">Platforms</Text>
               <div className="mt-2 flex flex-col gap-2">
@@ -611,37 +666,68 @@ useEffect(() => {
         {/* Hidden modals kept intact */}
         {user && (
           <>
-            <DeleteSongModal isOpen={deleteOpen} onClose={() => setDeleteOpen(false)} songId={song.id} songTitle={song.title} onDeleted={() => setSong(null)} />
-            <EditSongModal isOpen={editOpen} onClose={() => setEditOpen(false)} song={song} onUpdated={(updated) => setSong(updated)} />
             <AddToPlaylistModal isOpen={playlistOpen} onClose={() => setPlaylistOpen(false)} songId={song.id} />
-            <LinkSpotifyTrackModal open={spotifyLinkOpen} onOpenChange={setSpotifyLinkOpen} songTitle={song.title} currentSpotifyId={song.spotify_id} onLink={async (spotifyId) => {
-              const res = await fetch(`/api/songs/${song.id}`, {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-user-id': user?.id || '',
-                },
-                body: JSON.stringify({ spotify_id: spotifyId }),
-              })
-              if (!res.ok) throw new Error('Failed to update song')
-              const updated = await res.json()
-              setSong(updated)
-            }} onUnlink={async () => {
-              const res = await fetch(`/api/songs/${song.id}`, {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-user-id': user?.id || '',
-                },
-                body: JSON.stringify({ spotify_id: null }),
-              })
-              if (!res.ok) throw new Error('Failed to update song')
-              const updated = await res.json()
-              setSong(updated)
-            }} />
-            
+            <SongSuggestionModal open={suggestionOpen} onOpenChange={setSuggestionOpen} currentUserId={user.id} song={song} />
+            <MergeProposalModal open={mergeOpen} onOpenChange={setMergeOpen} currentUserId={user.id} song={song} />
           </>
         )}
+
+        <Dialog.Root open={creditsOpen} onOpenChange={setCreditsOpen}>
+          <Dialog.Content maxWidth="560px">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Dialog.Title mb="0">Credits</Dialog.Title>
+                <Dialog.Description size="2" color="gray">
+                  {credits.length > 0
+                    ? `Credits for ${song.title} (${song.year_released}).`
+                    : 'No credits have been attached to this song yet.'}
+                </Dialog.Description>
+              </div>
+              <Dialog.Close>
+                <button className="rounded-full border border-border/70 p-2 text-muted-foreground transition hover:border-border hover:text-foreground" aria-label="Close credits">
+                  <X className="h-4 w-4" />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {credits.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border/70 bg-background/45 px-4 py-6 text-center text-sm text-muted-foreground">
+                  No credits listed yet.
+                </div>
+              ) : (
+                credits.map((credit, index) => (
+                  <div
+                    key={`${credit.artistId ?? credit.artistName ?? 'credit'}-${credit.role ?? 'unknown'}-${index}`}
+                    className="rounded-2xl border border-border/70 bg-background/55 px-4 py-4 shadow-sm"
+                  >
+                    <Flex justify="between" align="center" gap="3" wrap="wrap">
+                      {credit.artistName ? (
+                        <Link
+                          to={`/search?credit=${encodeURIComponent(credit.artistName)}`}
+                          className="text-base font-medium text-foreground no-underline hover:text-primary"
+                        >
+                          {credit.artistName}
+                        </Link>
+                      ) : (
+                        <Text className="text-base font-medium text-foreground">Unknown artist</Text>
+                      )}
+                      <Text size="1" className="uppercase tracking-[0.22em] text-muted-foreground">
+                        {credit.role ?? 'Unspecified role'}
+                      </Text>
+                    </Flex>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <Flex justify="end" mt="4">
+              <Button variant="soft" color="gray" onClick={() => setCreditsOpen(false)}>
+                Close
+              </Button>
+            </Flex>
+          </Dialog.Content>
+        </Dialog.Root>
       </Box>
       <Footer />
     </Box>

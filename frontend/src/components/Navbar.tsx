@@ -12,7 +12,7 @@ const NAV_LINKS = [
   { to: '/search', label: 'Song Lookup' },
   { to: '/usersearch', label: 'User Lookup' },
   { to: '/trending', label: 'Trending' },
-  { to: '/songs/add', label: 'Add Song' },
+  { to: '/contributions', label: 'Contributions' },
   { to: '/recommend', label: 'Recommend' },
 ]
 

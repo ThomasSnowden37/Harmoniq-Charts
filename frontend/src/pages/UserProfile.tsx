@@ -7,6 +7,7 @@ import PlaylistSection from '../features/playlists/components/PlaylistSection'
 import DeleteUserModal from '../features/users/components/DeleteUserModal'
 import ManageFavoritesModal from '../features/songs/components/ManageFavoritesModal'
 import MutualFriendsModal from '../features/friends/components/MutualFriendsModal'
+import UserProposalsPanel from '../features/proposals/components/UserProposalsPanel'
 import type { PrivacySetting } from '../features/settings/types'
 import type { Playlist } from '../features/playlists/types'
 import type { SpotifyConnectionStatus } from '../features/spotify/types'
@@ -33,6 +34,7 @@ interface ProfileUser {
   id: string
   username: string
   privacy: PrivacySetting
+  reputation?: number
   restricted?: boolean
 }
 
@@ -623,6 +625,7 @@ export default function UserProfile() {
               <Tabs.Trigger value="reviews">Reviews</Tabs.Trigger>
               <Tabs.Trigger value="playlists">Playlists</Tabs.Trigger>
               <Tabs.Trigger value="liked">Liked Songs</Tabs.Trigger>
+              {isOwnProfile && <Tabs.Trigger value="contributions">Contributions</Tabs.Trigger>}
             </Tabs.List>
 
             <Tabs.Content value="reviews">
@@ -703,6 +706,12 @@ export default function UserProfile() {
                 )}
               </Card>
             </Tabs.Content>
+
+            {isOwnProfile && (
+              <Tabs.Content value="contributions">
+                <UserProposalsPanel userId={userId!} viewerId={MOCK_CURRENT_USER_ID} reputation={profileUser?.reputation ?? 0} />
+              </Tabs.Content>
+            )}
           </Tabs.Root>
         )}
       </Box>

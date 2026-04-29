@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 export default function SearchPage() {
   const [query, setQuery] = useState('');
   const [column, setColumn] = useState<
-  'title' | 'artist' | 'album' | 'genre' | 'bpm' | 'songwriter' | 'singles_by_artist' | 'rating'
+  'title' | 'artist' | 'album' | 'genre' | 'bpm' | 'credits' | 'singles_by_artist' | 'rating'
   >('title');
   const [songs, setSongs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -22,6 +22,9 @@ export default function SearchPage() {
   
   const navigate = useNavigate();
   
+  const creditNames = (song: any) =>
+    song.song_credits?.map((credit: any) => credit.artists?.name).filter(Boolean).join(', ') ?? '';
+
   const onSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!query.trim() && !singlesOnly && !listened && !liked && !listenedTo) return;
@@ -41,6 +44,10 @@ export default function SearchPage() {
             song_artists!inner (
               artists!inner (*)
             ),
+            song_credits (
+              role,
+              artists (*)
+            ),
             likes (*),
             listened (*),
             listento (*),
@@ -57,6 +64,10 @@ export default function SearchPage() {
             song_artists!inner (
               artists!inner (*)
             ),
+            song_credits (
+              role,
+              artists (*)
+            ),
             likes (*),
             listened (*),
             listento (*),
@@ -72,6 +83,10 @@ export default function SearchPage() {
             albums (*),
             song_artists!inner (
               artists!inner (*)
+            ),
+            song_credits (
+              role,
+              artists (*)
             ),
             likes (*),
             listened (*),
@@ -95,7 +110,7 @@ export default function SearchPage() {
     else if (column === 'artist') {
       queryBuilder = queryBuilder.ilike('song_artists.artists.name', `%${query}%`);
     } 
-    else if (query.trim()) {
+    else if (query.trim() && column !== 'credits') {
       queryBuilder = queryBuilder.ilike(column, `%${query}%`);
     }
 
@@ -131,6 +146,11 @@ export default function SearchPage() {
               song.listento?.some((l: any) => l.user_id === user.id) ?? false
             );
           }
+        }
+
+        if (column === 'credits' && query.trim()) {
+          const normalizedQuery = query.trim().toLowerCase();
+          filtered = filtered.filter((song: any) => creditNames(song).toLowerCase().includes(normalizedQuery));
         }
 
       setSongs(filtered);
@@ -246,7 +266,7 @@ export default function SearchPage() {
               <option value="album">Album</option>
               <option value="genre">Genre</option>
               <option value="bpm">BPM</option>
-              <option value="songwriter">Songwriters</option>
+              <option value="credits">Credits</option>
               <option value="rating">Star Rating</option>
             </select>
 
@@ -318,7 +338,7 @@ export default function SearchPage() {
                                   </span>
                                 ))}
                                 </div>
-                              <div className="flex-1 min-w-[200px]">Songwriter(s): {renderBold(song.songwriter, "songwriter")} </div>
+                              <div className="flex-1 min-w-[200px]">Credits: {renderBold(creditNames(song), "credits")} </div>
                               <div className="flex-1 min-w-[120px]">Album: {renderBold(song.albums?.name ?? "Single", "album")} </div>
                           </div>      
 

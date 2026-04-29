@@ -14,7 +14,7 @@ interface Song {
     bpm: number
     genre: string
     album: string
-    song_writer: string
+  credits: string
     artist: string
 }
 
@@ -28,11 +28,14 @@ export default function RecommendResult() {
   const [error, setError] = useState<string | null>(null)
   const [artistLikeness, setArtistLikeness] = useState(false);
   const [albumLikeness, setAlbumLikeness] = useState(false);
-  const [songwriterLikeness, setSongwriterLikeness] = useState(false);
+  const [creditLikeness, setCreditLikeness] = useState(false);
   const [bpmLikeness, setBpmLikeness] = useState(false);
   
   const navigate = useNavigate();
   
+  const creditNames = (song: any) =>
+    song.song_credits?.map((credit: any) => credit.artists?.name).filter(Boolean).join(', ') ?? '';
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -45,6 +48,10 @@ export default function RecommendResult() {
           albums!inner (*),
           song_artists!inner (
             artists!inner (*)
+          ),
+          song_credits (
+            role,
+            artists (*)
           )
         `)
         .neq('id', targetSong?.id) 
@@ -61,13 +68,6 @@ export default function RecommendResult() {
         }
       }
 
-      if (songwriterLikeness && targetSong?.song_writer) {
-        const writers = targetSong.song_writer.split(',').map(w => w.trim());
-        queryBuilder = queryBuilder.or(
-          writers.map(w => `songwriter.ilike.%${w}%`).join(',')
-        );
-      }
-
       if (bpmLikeness && targetSong?.bpm) {
           const bpmMin = targetSong.bpm - 5;
           const bpmMax = targetSong.bpm + 5;
@@ -78,14 +78,28 @@ export default function RecommendResult() {
         const { data, error } = await queryBuilder;
 
         if (!error && data) {
+          let filtered = data;
+
+          if (creditLikeness && targetSong?.credits) {
+            const writers = targetSong.credits
+              .split(',')
+              .map((writer) => writer.trim().toLowerCase())
+              .filter(Boolean);
+
+            filtered = filtered.filter((song: any) => {
+              const normalizedCredits = creditNames(song).toLowerCase();
+              return writers.some((writer) => normalizedCredits.includes(writer));
+            });
+          }
+
           if (bpmLikeness && targetSong?.bpm) {
             // sort using targetSong.bpm directly
-            const sorted = data.sort((a: any, b: any) => 
+            const sorted = filtered.sort((a: any, b: any) => 
               Math.abs(a.bpm - targetSong.bpm) - Math.abs(b.bpm - targetSong.bpm)
             );
             setSongs(sorted);
           } else {
-            setSongs(data);
+            setSongs(filtered);
           }
         } else if (error) {
           console.error(error);
@@ -108,7 +122,7 @@ export default function RecommendResult() {
     const filterMap: Record<string, boolean> = {
       artist: artistLikeness,
       album: albumLikeness,
-      songwriter: songwriterLikeness,
+      credits: creditLikeness,
       bpm: bpmLikeness
     };
 
@@ -128,7 +142,7 @@ export default function RecommendResult() {
         const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
         onSubmit(fakeEvent);
       }
-    }, [artistLikeness, albumLikeness, bpmLikeness, songwriterLikeness, targetSong]);
+    }, [artistLikeness, albumLikeness, bpmLikeness, creditLikeness, targetSong]);
 
     useEffect(() => {
       if (!id) return;
@@ -142,6 +156,10 @@ export default function RecommendResult() {
               *,
               albums!inner (*),
               song_artists (
+                artists (*)
+              ),
+              song_credits (
+                role,
                 artists (*)
               )
             `)
@@ -159,7 +177,7 @@ export default function RecommendResult() {
               bpm: data.bpm,
               genre: data.genre,
               album: data.albums?.name ?? 'Single',
-              song_writer: data.songwriter ?? '',
+                credits: creditNames(data),
                artist: data.song_artists?.map((sa: any) => sa.artists.name).join(', ') ?? ''
             });
           }
@@ -200,7 +218,7 @@ export default function RecommendResult() {
               </div>
 
               <div className="text-sm text-muted-foreground mt-1">
-                 Songwriter(s): {targetSong?.song_writer}
+                  Credits: {targetSong?.credits || 'No credits listed'}
               </div>
 
               <div className="text-sm text-muted-foreground mt-1">
@@ -229,8 +247,8 @@ export default function RecommendResult() {
               </label>
 
               <label className="flex items-center gap-1 whitespace-nowrap">
-                <input type="checkbox" checked={songwriterLikeness} onChange={(e) => setSongwriterLikeness(e.target.checked)} />
-                Song Writers
+                <input type="checkbox" checked={creditLikeness} onChange={(e) => setCreditLikeness(e.target.checked)} />
+                Credits
               </label>
               
               <label className="flex items-center gap-1 whitespace-nowrap">
@@ -284,7 +302,7 @@ export default function RecommendResult() {
                                   </span>
                                 ))}
                                 </div>
-                              <div className="flex-1 min-w-[200px]">Songwriter(s): {renderBold(song.songwriter, "songwriter")} </div>
+                              <div className="flex-1 min-w-[200px]">Credits: {renderBold(creditNames(song), "credits")} </div>
                               <div className="flex-1 min-w-[120px]">Album: {renderBold(song.albums?.name ?? "Single", "album")} </div>
                           </div>      
 

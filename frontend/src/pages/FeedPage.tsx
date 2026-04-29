@@ -26,7 +26,7 @@ interface Trendsong {
     title: string
     bpm: number
     genre: string
-    songwriter?: string
+    credits?: string
     song_artists?: {artists: {name: string}}[]
     albums?: { name: string }
     year_released: number

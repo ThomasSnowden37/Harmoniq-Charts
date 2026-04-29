@@ -72,12 +72,37 @@ router.get('/:id', async (req, res) => {
     res.json(data)
 })
 
+router.get('/:id/credits', async (req, res) => {
+    const songId = req.params.id
+    if (!songId) return res.status(400).json({ error: 'song id is required' })
+
+    const { data, error } = await supabase
+        .from('song_credits')
+        .select(`
+            role,
+            artist_id,
+            artists ( id, name )
+        `)
+        .eq('song_id', songId)
+        .order('role', { ascending: true })
+
+    if (error) {
+        return res.status(500).json({ error: 'Failed to load song credits' })
+    }
+
+    res.json(data ?? [])
+})
+
 /**
  * Import a new song
  */
 router.post('/add', async (req, res) => {
 
-    const { userId, title, bpm, genre, year_released, album_name, artist_name, spotify_id } = req.body
+    const { userId, title, bpm, genre, year_released, album_name, artist_name, spotify_id, spotify_import, duration_ms } = req.body
+
+    if (spotify_import) {
+        return res.status(400).json({ error: 'Direct Spotify song importing is disabled. Submit a contribution and link the Spotify track instead.' })
+    }
 
     if (!userId)
         return res.status(400).json({ error: 'Must be logged in to add song' })
@@ -95,24 +120,60 @@ router.post('/add', async (req, res) => {
     }
 
     const genreValue = genre === undefined || genre === null || genre === '' ? null : genre
+    const durationMsValue = duration_ms === undefined || duration_ms === null || duration_ms === '' ? null : Number(duration_ms)
+
+    if (durationMsValue !== null && (Number.isNaN(durationMsValue) || durationMsValue < 0)) {
+        return res.status(400).json({ error: 'Invalid duration' })
+    }
+
+    const artistNames = String(artist_name)
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean)
+
+    if (artistNames.length === 0) {
+        return res.status(400).json({ error: 'At least one artist is required' })
+    }
+
+    const primaryArtistName = artistNames[0]
 
     console.log(userId)
 
-    //check if the artist exists and if not create them
-    let { data: artist } = await supabase
-        .from('artists')
-        .select('id')
-        .eq('name', artist_name)
-        .single()
-    if (!artist) {
-        const { data: Createartist} = await supabase
-            .from('artists')
-            .insert({ name: artist_name })
-            .select()
-            .single()
-        artist = Createartist
+    if (spotify_id) {
+        const { data: existingSpotifySong } = await supabase
+            .from('songs')
+            .select('id')
+            .eq('spotify_id', spotify_id)
+            .limit(1)
+
+        if (existingSpotifySong && existingSpotifySong.length > 0) {
+            return res.status(409).json({ error: 'This Spotify song has already been imported' })
+        }
     }
-    const artist_id = artist?.id
+
+    const artistIds: string[] = []
+    for (const artistNameValue of artistNames) {
+        let { data: artist } = await supabase
+            .from('artists')
+            .select('id')
+            .eq('name', artistNameValue)
+            .single()
+
+        if (!artist) {
+            const { data: createdArtist } = await supabase
+                .from('artists')
+                .insert({ name: artistNameValue })
+                .select()
+                .single()
+            artist = createdArtist
+        }
+
+        if (artist?.id) {
+            artistIds.push(artist.id)
+        }
+    }
+
+    const primaryArtistId = artistIds[0]
 
     //check if the album exists and if not create it
     let album_id: string | null = null
@@ -128,7 +189,7 @@ router.post('/add', async (req, res) => {
             .from('album_artists')
             .select('album_id')
             .in('album_id', albumID)
-            .eq('artist_id', artist_id)
+            .eq('artist_id', primaryArtistId)
             .limit(1)
         if (correctAlbum && correctAlbum.length > 0) {
             album_id = correctAlbum[0].album_id
@@ -149,15 +210,25 @@ router.post('/add', async (req, res) => {
         .from('album_artists')
         .select('*')
         .eq('album_id', album_id)
-        .eq('artist_id', artist_id)
+        .eq('artist_id', primaryArtistId)
         .single()
-    if (!albumArtist) {
+    if (!albumArtist && primaryArtistId) {
         const { data: newAA } = await supabase
         .from('album_artists')
         .insert({
             album_id,
-            artist_id
+            artist_id: primaryArtistId
         })
+    }
+
+    for (const artistId of artistIds.slice(1)) {
+        await supabase
+            .from('album_artists')
+            .insert({
+                album_id,
+                artist_id: artistId,
+            })
+            .select('*')
     }
 
     //Check if song added is a duplicate 
@@ -175,7 +246,7 @@ router.post('/add', async (req, res) => {
             .from('song_artists')
             .select('song_id')
             .in('song_id', songsID)
-            .eq('artist_id', artist_id)
+            .eq('artist_id', primaryArtistId)
             .limit(1)
 
         if (songsSameArtist && songsSameArtist.length > 0 ) {
@@ -193,20 +264,24 @@ router.post('/add', async (req, res) => {
             bpm: bpmValue,
             genre: genreValue,
             year_released,
+            duration_ms: durationMsValue,
             album_id,
             spotify_id: spotify_id ?? null,
+            spotify_import: Boolean(spotify_import),
         })
         .select()
         .single()
     const song_id = song.id 
     if (error) return res.status(500).json({ error: error.message })
 
-    const { data: newSongArtist } = await supabase
-        .from('song_artists')
-        .insert({
-            song_id,
-            artist_id
-        })
+    for (const artistId of artistIds) {
+        await supabase
+            .from('song_artists')
+            .insert({
+                song_id,
+                artist_id: artistId,
+            })
+    }
     res.status(201).json(song)
 })
 

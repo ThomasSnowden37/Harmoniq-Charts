@@ -1,5 +1,22 @@
 // Spotify-related types for frontend
 
+export type SpotifyEntityType = 'track' | 'artist' | 'album'
+
+export interface SpotifyLookupItem {
+  id: string
+  type: SpotifyEntityType
+  name: string
+  subtitle: string
+  image_url: string | null
+  spotify_url: string | null
+}
+
+export interface SpotifyEntitySearchResult {
+  type: SpotifyEntityType
+  total: number
+  items: SpotifyLookupItem[]
+}
+
 export interface SpotifyConnectionStatus {
   connected: boolean
   displayName?: string
@@ -43,8 +60,11 @@ export interface SpotifyTrack {
     images: Array<{ url: string; height: number; width: number }>
   }
   audioFeatures?: {
-    tempo: number
+    tempo: number | null
   }
+  bpm?: number | null
+  genres?: string[]
+  primaryGenre?: string | null
 }
 
 export interface SpotifySearchResult {
@@ -54,6 +74,45 @@ export interface SpotifySearchResult {
   }
 }
 
+export interface PlaylistImportCandidate {
+  songId: string
+  title: string
+  artistNames: string[]
+  albumName: string | null
+  spotifyId: string | null
+  confidence: number
+  reasons: string[]
+}
+
+export interface PlaylistImportPreviewItem {
+  trackId: string
+  title: string
+  artists: string[]
+  album: string | null
+  year_released: number | null
+  bpm: number | null
+  position: number
+  matchState: 'linked' | 'match_available' | 'no_match'
+  songId: string | null
+  matchedTitle?: string | null
+  candidates: PlaylistImportCandidate[]
+}
+
+export interface PlaylistImportPreview {
+  playlist: {
+    id: string
+    name: string
+  }
+  counts: {
+    linked: number
+    matchAvailable: number
+    noMatch: number
+    skipped: number
+  }
+  items: PlaylistImportPreviewItem[]
+  skipped: Array<{ title: string; reason?: string }>
+}
+
 export interface ImportResult {
   success: boolean
   playlist: {
@@ -61,20 +120,18 @@ export interface ImportResult {
     name: string
   }
   counts: {
-    found: number
-    imported: number
+    linked: number
+    confirmed: number
+    unmatched: number
     skipped: number
   }
-  found: Array<{ title: string; songId?: string }>
-  imported: Array<{
+  added: Array<{
     title: string
-    spotify_id?: string
-    artists?: string[]
-    album?: string | null
-    year_released?: number | null
-    bpm?: number | null
-    songId?: string
+    songId: string
+    position: number
+    source: 'linked' | 'confirmed'
   }>
+  unmatched: Array<{ title: string; trackId: string }>
   skipped: Array<{ title: string; reason?: string }>
 }
 

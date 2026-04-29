@@ -44,6 +44,15 @@ CREATE TABLE song_artists (
     PRIMARY KEY (song_id, artist_id)
 );
 
+CREATE TABLE song_credits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    song_id UUID REFERENCES songs(id) ON DELETE CASCADE NOT NULL,
+    artist_id UUID REFERENCES artists(id) ON DELETE CASCADE NOT NULL,
+    role TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(song_id, artist_id, role)
+);
+
 CREATE TABLE album_artists (
     album_id UUID REFERENCES albums(id) ON DELETE CASCADE,
     artist_id UUID REFERENCES artists(id) ON DELETE CASCADE,
@@ -191,6 +200,8 @@ CREATE INDEX idx_playlist_likes_playlist_id ON playlist_likes(playlist_id);
 CREATE INDEX idx_playlist_likes_user_id ON playlist_likes(user_id);
 CREATE INDEX idx_playlist_comments_playlist_id ON playlist_comments(playlist_id);
 CREATE INDEX idx_songs_album_id ON songs(album_id);
+CREATE INDEX idx_song_credits_song_id ON song_credits(song_id);
+CREATE INDEX idx_song_credits_artist_id ON song_credits(artist_id);
 CREATE INDEX idx_recommendations_source ON recommendations(source_song_id);
 CREATE INDEX idx_friend_requests_requester ON friend_requests(requester_id);
 CREATE INDEX idx_friend_requests_addressee ON friend_requests(addressee_id);
@@ -212,6 +223,7 @@ ALTER TABLE songs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE artists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE albums ENABLE ROW LEVEL SECURITY;
 ALTER TABLE song_artists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE song_credits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE album_artists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recommendations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE friend_requests ENABLE ROW LEVEL SECURITY;
@@ -222,6 +234,7 @@ CREATE POLICY "Public read access" ON songs FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON artists FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON albums FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON song_artists FOR SELECT USING (true);
+CREATE POLICY "Public read access" ON song_credits FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON album_artists FOR SELECT USING (true);
 
 -- Policies for user-specific content

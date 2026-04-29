@@ -112,6 +112,29 @@ export interface Database {
           artist_id?: string
         }
       }
+      song_credits: {
+        Row: {
+          id: string
+          song_id: string
+          artist_id: string
+          role: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          song_id: string
+          artist_id: string
+          role: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          song_id?: string
+          artist_id?: string
+          role?: string
+          created_at?: string
+        }
+      }
       album_artists: {
         Row: {
           album_id: string
@@ -366,29 +389,29 @@ export interface Database {
           spotify_profile_url?: string | null
           created_at?: string
           updated_at?: string
-          favorite_songs: {
-            Row: {
-              id: string
-              user_id: string
-              song_id: string
-              position: number
-              created_at: string
-            }
-            Insert: {
-              id?: string
-              user_id: string
-              song_id: string
-              position: number
-              created_at?: string
-            }
-            Update: {
-              id?: string
-              user_id?: string
-              song_id?: string
-              position?: number
-              created_at?: string
-            }
-          }
+        }
+      }
+      favorite_songs: {
+        Row: {
+          id: string
+          user_id: string
+          song_id: string
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          song_id: string
+          position: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          song_id?: string
+          position?: number
+          created_at?: string
         }
       }
     }
