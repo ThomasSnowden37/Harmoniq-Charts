@@ -45,7 +45,8 @@ router.post('/google-sync', async (req, res) => {
         id: userUuid, 
         email: email, 
         username: username, 
-        privacy: 'public' 
+        privacy: 'public',
+        is_admin: false
       })
       .select()
       .single();

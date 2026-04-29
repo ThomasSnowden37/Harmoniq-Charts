@@ -11,6 +11,7 @@ interface GoogleUser {
   name: string;
   email: string;
   picture: string;
+  is_admin?: boolean;
 }
 
 interface AuthContextType {

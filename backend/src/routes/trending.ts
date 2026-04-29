@@ -61,7 +61,7 @@ router.get('/playlists', async (req, res) => {
 
     const { data: users, error: userError} = await supabase
         .from('users')
-        .select('id, username, privacy')
+        .select('id, username, privacy, is_admin')
         .in('id', userIds)
     
     if (userError) {

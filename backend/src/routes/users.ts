@@ -26,7 +26,7 @@ router.get('/:id', async (req, res) => {
 
   const { data, error } = await supabase
     .from('users')
-    .select('id, username, email, privacy, created_at')
+    .select('id, username, email, privacy, created_at, is_admin')
     .eq('id', profileId)
     .single()
 
@@ -70,7 +70,7 @@ router.patch('/:id', async (req, res) => {
     .from('users')
     .update(updates)
     .eq('id', userId)
-    .select('id, username, email, privacy, created_at')
+    .select('id, username, email, privacy, created_at, is_admin')
     .single()
 
   if (error) return res.status(500).json({ error: error.message })

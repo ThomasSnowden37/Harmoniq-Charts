@@ -33,6 +33,7 @@ interface ProfileUser {
   id: string
   username: string
   privacy: PrivacySetting
+  is_admin: boolean
   restricted?: boolean
 }
 
@@ -122,6 +123,9 @@ export default function UserProfile() {
     if (!isOwnProfile) {
       fetchRelationship()
       fetchMutualFriends()
+    } else {
+      // Reset relationship state when viewing own profile
+      setRelationship({ status: 'none' })
     }
 
     // If the user navigated while the Playlists tab is active, fetch playlists for the new profile
@@ -474,6 +478,9 @@ export default function UserProfile() {
                 >
                   {profileUser?.privacy === 'private' ? 'Private' : 'Public'}
                 </Badge>
+                {profileUser?.is_admin && (
+                  <Badge variant="soft" color="purple">Admin</Badge>
+                )}
                 {relationship.status === 'friends' && (
                   <Badge variant="soft" color="green">Friends</Badge>
                 )}

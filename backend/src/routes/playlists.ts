@@ -75,7 +75,7 @@ router.get('/user/:userId', async (req, res) => {
 async function canAccessPlaylist(playlistId: string, requesterId: string | undefined): Promise<{ allowed: boolean; playlist?: any }> {
   const { data: playlist } = await supabase
     .from('playlists')
-    .select('user_id, users(privacy)')
+    .select('user_id, users(privacy, is_admin)')
     .eq('id', playlistId)
     .single()
 
@@ -98,7 +98,7 @@ router.get('/:id', async (req, res) => {
 
   const { data: playlist, error: playlistError } = await supabase
     .from('playlists')
-    .select('*, users(username, privacy)')
+    .select('*, users(username, privacy, is_admin)')
     .eq('id', id)
     .single()
 
@@ -518,7 +518,7 @@ router.get('/:id/comments', async (req, res) => {
 
   const { data: comments, error } = await supabase
     .from('playlist_comments')
-    .select('*, users(id, username)')
+    .select('*, users(id, username, is_admin)')
     .eq('playlist_id', id)
     .order('created_at', { ascending: false })
 
@@ -546,7 +546,7 @@ router.post('/:id/comments', async (req, res) => {
   const { data, error } = await supabase
     .from('playlist_comments')
     .insert({ playlist_id: id, user_id: userId, content: content.trim() })
-    .select('*, users(id, username)')
+    .select('*, users(id, username, is_admin)')
     .single()
 
   if (error) return res.status(500).json({ error: error.message })

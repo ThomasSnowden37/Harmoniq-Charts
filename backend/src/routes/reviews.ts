@@ -27,7 +27,7 @@ router.get('/song/:songId', async (req, res) => {
 
   const { data, error } = await supabase
     .from('reviews')
-    .select('id, content, created_at, user_id, users(username)')
+    .select('id, content, created_at, user_id, users(username, is_admin)')
     .eq('song_id', songId)
     .order('created_at', { ascending: false })
 

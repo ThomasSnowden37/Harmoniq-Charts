@@ -69,7 +69,7 @@ router.get('/incoming', async (req, res) => {
 
   const { data, error } = await supabase
     .from('friend_requests')
-    .select('*, requester:users!requester_id(id, username)')
+    .select('*, requester:users!requester_id(id, username, is_admin)')
     .eq('addressee_id', userId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false }) // I guess if these queries become too big we could use an ORM like prisma
@@ -85,7 +85,7 @@ router.get('/outgoing', async (req, res) => {
 
   const { data, error } = await supabase
     .from('friend_requests')
-    .select('*, addressee:users!addressee_id(id, username)')
+    .select('*, addressee:users!addressee_id(id, username, is_admin)')
     .eq('requester_id', userId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
@@ -101,7 +101,7 @@ router.get('/friends', async (req, res) => {
 
   const { data, error } = await supabase
     .from('friend_requests')
-    .select('*, requester:users!requester_id(id, username), addressee:users!addressee_id(id, username)')
+    .select('*, requester:users!requester_id(id, username, is_admin), addressee:users!addressee_id(id, username, is_admin)')
     .eq('status', 'accepted')
     .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
 
