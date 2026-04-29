@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { isAdminUser } from '../lib/admin.js'
 import { supabase } from '../lib/supabase.js'
 import { generateKey } from 'crypto'
 import * as spotify from '../lib/spotify.js'
@@ -14,7 +15,6 @@ import * as spotify from '../lib/spotify.js'
  */
 
 const router = Router()
-
 
 /**
  * Get all listened to for user
@@ -259,7 +259,6 @@ router.post('/add', async (req, res) => {
     const { data: song, error} = await supabase
         .from('songs')
         .insert({
-            user_id: userId ?? null,
             title,
             bpm: bpmValue,
             genre: genreValue,
@@ -301,18 +300,20 @@ router.delete('/:id', async (req, res) => {
         return res.status(400).json({ error: 'Song ID is required' })
     }
     try {
-        //check if the song exists and belongs to the user
+        const isAdmin = await isAdminUser(userId)
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Admin access required' })
+        }
+
         const { data: existSong, error: noSong } = await supabase 
             .from('songs')
-            .select('id, user_id')
+            .select('id')
             .eq('id',songId )
             .single()
         if (noSong) {
             return res.status(404).json({ error: 'Song is not found' })
         }
-        if (existSong.user_id != userId) {
-            return res.status(404).json({ error: 'You can only delete your own songs' })
-        }
+
         //delete the song
         const { error : deleteError } = await supabase
             .from('songs')
@@ -350,18 +351,18 @@ router.patch('/:id', async (req, res) => {
         return res.status(400).json({ error: 'Invalid Year' })
     }
     try {
-        //check if the song exists and belongs to the user
+        const isAdmin = await isAdminUser(userId)
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Admin access required' })
+        }
+
         const { data: existSong, error: noSong } = await supabase 
             .from('songs')
-            .select('id, user_id')
+            .select('id')
             .eq('id',songId )
             .single()
         if (noSong) {
             return res.status(404).json({ error: 'Song is not found' })
-        }
-
-        if (existSong.user_id != userId) {
-            return res.status(403).json({ error: 'You can only edit your own songs' })
         }
 
         // Build update object; only set spotify_id when provided in request

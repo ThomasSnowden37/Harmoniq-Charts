@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { isAdminUser } from '../lib/admin.js'
 import { supabase } from '../lib/supabase.js'
 import { isFriend} from './friends.js'
 
@@ -482,6 +483,7 @@ router.post('/:id/likes', async (req, res) => {
     }
     return res.status(500).json({ error: error.message })
   }
+  const { data: trend, error: trend_error } = await supabase.rpc('get_trending_playlists');
   res.status(201).json(data)
 })
 
@@ -501,6 +503,7 @@ router.delete('/:id/likes', async (req, res) => {
     .eq('user_id', userId)
 
   if (error) return res.status(500).json({ error: error.message })
+  const { data: trend, error: trend_error } = await supabase.rpc('get_trending_playlists');
   res.json({ message: 'Like removed' })
 })
 
@@ -568,7 +571,10 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
     .single()
 
   if (fetchError) return res.status(404).json({ error: 'Comment not found' })
-  if (comment.user_id !== userId) return res.status(403).json({ error: 'Forbidden' })
+
+  if (comment.user_id !== userId && !(await isAdminUser(userId))) {
+    return res.status(403).json({ error: 'You can only delete your own comments' })
+  }
 
   const { error } = await supabase
     .from('playlist_comments')

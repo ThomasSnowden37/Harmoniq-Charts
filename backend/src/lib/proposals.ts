@@ -78,7 +78,6 @@ type SongSnapshot = {
   spotify_import: boolean
   album_id: string | null
   album_name: string | null
-  user_id: string | null
   artist_ids: string[]
   artist_names: string[]
   credits: ProposalCreditInput[]
@@ -459,7 +458,6 @@ function mapSongSnapshot(raw: any): SongSnapshot {
     spotify_import: Boolean(raw.spotify_import),
     album_id: typeof raw.album_id === 'string' ? raw.album_id : null,
     album_name: typeof raw?.albums?.name === 'string' ? raw.albums.name : null,
-    user_id: typeof raw.user_id === 'string' ? raw.user_id : null,
     artist_ids: artistIds,
     artist_names: artistNames,
     credits,
@@ -478,7 +476,6 @@ function serializeSongSnapshot(song: SongSnapshot): JsonObject {
     spotify_import: song.spotify_import,
     album_id: song.album_id,
     album_name: song.album_name,
-    user_id: song.user_id,
     artist_ids: song.artist_ids,
     artist_names: song.artist_names,
     credits: song.credits as unknown as JsonValue,
@@ -514,7 +511,6 @@ function parseSongSnapshot(value: JsonValue | null): SongSnapshot | null {
     spotify_import: Boolean(source.spotify_import),
     album_id: typeof source.album_id === 'string' ? source.album_id : null,
     album_name: typeof source.album_name === 'string' ? source.album_name : null,
-    user_id: typeof source.user_id === 'string' ? source.user_id : null,
     artist_ids: artistIds,
     artist_names: artistNames,
     credits,

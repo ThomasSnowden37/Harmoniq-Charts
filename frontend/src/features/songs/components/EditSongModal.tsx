@@ -13,7 +13,6 @@ interface Song {
     bpm: number
     genre: string
     year_released: number
-    user_id: string
   spotify_id?: string | null
 }
 

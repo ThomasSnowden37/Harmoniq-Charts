@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabase.js'
+import { isAdminUser } from '../lib/admin.js'
 import { v5 as uuidv5 } from 'uuid';
 
 /**
@@ -29,14 +30,19 @@ router.post('/google-sync', async (req, res) => {
     // Generate the UUID
     const userUuid = uuidv5(id, NAMESPACE);
 
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: existingUserError } = await supabase
       .from('users')
-      .select('*')
+      .select('id, username, email, privacy, created_at')
       .eq('id', userUuid)
-      .single();
+      .maybeSingle();
+
+    if (existingUserError) throw existingUserError;
 
     if (existingUser) {
-      return res.json(existingUser);
+      return res.json({
+        ...existingUser,
+        is_admin: await isAdminUser(userUuid),
+      });
     }
 
     const { data: newUser, error } = await supabase
@@ -45,13 +51,16 @@ router.post('/google-sync', async (req, res) => {
         id: userUuid, 
         email: email, 
         username: username, 
-        privacy: 'public' 
+        privacy: 'public',
       })
-      .select()
+      .select('id, username, email, privacy, created_at')
       .single();
 
     if (error) throw error;
-    res.json(newUser);
+    res.json({
+      ...newUser,
+      is_admin: false,
+    });
 
   } catch (err: any) {
     console.error("Supabase Sync Error:", err.message);

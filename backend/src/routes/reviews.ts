@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { isAdminUser } from '../lib/admin.js'
 import { supabase } from '../lib/supabase.js'
 
 /**
@@ -104,7 +105,10 @@ router.delete('/:reviewId', async (req, res) => {
     .maybeSingle()
 
   if (!existing) return res.status(404).json({ error: 'Review not found' })
-  if (existing.user_id !== userId) return res.status(403).json({ error: 'You can only delete your own reviews' })
+
+    const isOwner = existing.user_id === userId
+    const isAdmin = await isAdminUser(userId)
+  if (!isOwner && !isAdmin) return res.status(403).json({ error: 'You can only delete your own reviews' })
 
   const { error } = await supabase.from('reviews').delete().eq('id', reviewId)
   if (error) return res.status(500).json({ error: error.message })

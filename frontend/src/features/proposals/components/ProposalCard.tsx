@@ -219,7 +219,6 @@ export default function ProposalCard({ proposal, currentUserId, showVoting = tru
 
   const canVote = Boolean(currentUserId && showVoting && proposal.status === 'pending' && proposal.proposer_id !== currentUserId)
   const summary = useMemo(() => proposalHeadline(proposal), [proposal])
-  const spotifyLink = useMemo(() => proposalSpotifyLink(proposal), [proposal])
   const canSubmitReject = Boolean(
     rejectReason.trim() || (rejectReasonCode && !rejectionReasonRequiresText(rejectReasonCode)),
   )
@@ -246,8 +245,7 @@ export default function ProposalCard({ proposal, currentUserId, showVoting = tru
 
   async function handleAdminAction(action: 'approve' | 'reject' | 'merge' | 'revert') {
     if (!currentUserId) return
-    const reason = window.prompt(`Reason for ${action}:`, proposal.reason) ?? ''
-    if (!reason.trim()) return
+    const reason = proposal.reason.trim() || `Admin ${action}`
 
     setLoadingAction(action)
     setError(null)

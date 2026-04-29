@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Button, Avatar, Box, Card, Dialog, Flex, Heading, Text } from '@radix-ui/themes'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
+import DeleteSongModal from '../features/songs/components/DeleteSongModal'
+import EditSongModal from '../features/songs/components/EditSongModal'
 import RatingSong from '../features/songs/components/RatingSong'
 import { Heart, Headphones, Clock, Star, Plus, GitMerge, PencilLine, ScrollText, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext';
@@ -102,7 +104,6 @@ interface Song {
   year_released?: number | null
   duration_ms?: number | null
   spotify_import?: boolean
-  user_id?: string | null
   spotify_id?: string | null
   album_id?: string | null
   albums?: { id: string; name: string } | null
@@ -152,11 +153,14 @@ function normalizeSongCredits(song: Song | null): NormalizedSongCredit[] {
 export default function SongPage() {
     const { user } = useAuth()
     const { id } = useParams()
+  const navigate = useNavigate()
     const [loading, setLoading] = useState(true)
     const [song, setSong] = useState<Song | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [suggestionOpen, setSuggestionOpen] = useState(false)
     const [mergeOpen, setMergeOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
     const [playlistOpen, setPlaylistOpen] = useState(false)
     const [creditsOpen, setCreditsOpen] = useState(false)
     const [listenedCount, setListenedCount] = useState(0)
@@ -301,6 +305,8 @@ useEffect(() => {
 
   const artists = song.song_artists?.map((entry) => entry?.artists).filter(Boolean) as Array<{ id: string; name: string }> | undefined
   const credits = normalizeSongCredits(song)
+  const canManageSong = Boolean(user?.isAdmin)
+
 
   return (
     <Box className="min-h-screen flex flex-col">
@@ -380,6 +386,13 @@ useEffect(() => {
                   {credits.length > 0 ? ` (${credits.length})` : ''}
                 </Button>
               </div>
+
+              {canManageSong && (
+                <div className="mt-4 flex items-center gap-2">
+                  <Button size="2" onClick={() => setEditOpen(true)}>Edit</Button>
+                  <Button size="2" color="red" onClick={() => setDeleteOpen(true)}>Delete</Button>
+                </div>
+              )}
 
               <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
@@ -640,7 +653,7 @@ useEffect(() => {
                       <span className="text-xs text-muted-foreground">
                         {new Date(review.created_at).toLocaleDateString()}
                       </span>
-                      {user?.id === review.user_id && (
+                      {(user?.id === review.user_id || user?.isAdmin === true) && (
                         <button
                           className="text-xs text-destructive hover:underline cursor-pointer"
                           onClick={async () => {
@@ -667,6 +680,29 @@ useEffect(() => {
         {user && (
           <>
             <AddToPlaylistModal isOpen={playlistOpen} onClose={() => setPlaylistOpen(false)} songId={song.id} />
+            <EditSongModal
+              isOpen={editOpen}
+              onClose={() => setEditOpen(false)}
+              song={{
+                id: song.id,
+                title: song.title,
+                bpm: song.bpm ?? 0,
+                genre: song.genre ?? '',
+                year_released: song.year_released ?? 0,
+                spotify_id: song.spotify_id ?? null,
+              }}
+              onUpdated={(updatedSong) => {
+                setSong((currentSong) => currentSong ? { ...currentSong, ...updatedSong } : currentSong)
+                setEditOpen(false)
+              }}
+            />
+            <DeleteSongModal
+              isOpen={deleteOpen}
+              onClose={() => setDeleteOpen(false)}
+              songId={song.id}
+              songTitle={song.title}
+              onDeleted={() => navigate('/feed')}
+            />
             <SongSuggestionModal open={suggestionOpen} onOpenChange={setSuggestionOpen} currentUserId={user.id} song={song} />
             <MergeProposalModal open={mergeOpen} onOpenChange={setMergeOpen} currentUserId={user.id} song={song} />
           </>

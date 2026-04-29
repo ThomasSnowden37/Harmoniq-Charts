@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { isAdminUser } from '../lib/admin.js'
 import { supabase } from '../lib/supabase.js'
 import { isFriend } from './friends.js'
 
@@ -32,16 +33,21 @@ router.get('/:id', async (req, res) => {
 
   if (error) return res.status(404).json({ error: 'User not found' })
 
+  const response = {
+    ...data,
+    is_admin: await isAdminUser(profileId),
+  }
+
   // Public profiles, own profile, or no viewer — return full data
   if (data.privacy === 'public' || viewerId === profileId) {
-    return res.json(data)
+    return res.json(response)
   }
 
   // Private profile — check if the viewer is friends with this user
   if (viewerId) {
     const isFriendFlag = await isFriend(viewerId, profileId)
     if (isFriendFlag) {
-      return res.json(data)
+      return res.json(response)
     }
   }
 
@@ -74,7 +80,10 @@ router.patch('/:id', async (req, res) => {
     .single()
 
   if (error) return res.status(500).json({ error: error.message })
-  res.json(data)
+  res.json({
+    ...data,
+    is_admin: await isAdminUser(userId),
+  })
 })
 
 /**

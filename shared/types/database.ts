@@ -69,7 +69,6 @@ export interface Database {
           year_released: number | null
           album_id: string | null
           created_at: string
-          user_id: string | null
           spotify_id: string | null
           trending_score: number | null
         }
@@ -81,7 +80,6 @@ export interface Database {
           year_released?: number | null
           album_id?: string | null
           created_at?: string
-          user_id: string | null
           spotify_id?: string | null
           trending_score: number | null
         }
@@ -93,7 +91,6 @@ export interface Database {
           year_released?: number | null
           album_id?: string | null
           created_at?: string
-          user_id: string | null
           spotify_id?: string | null
           trending_score: number | null
         }
@@ -269,6 +266,7 @@ export interface Database {
           is_pinned: boolean
           created_at: string
           spotify_playlist_id: string | null
+          trending_score: number | null
         }
         Insert: {
           id?: string
@@ -277,6 +275,7 @@ export interface Database {
           is_pinned?: boolean
           created_at?: string
           spotify_playlist_id?: string | null
+          trending_score: number | null
         }
         Update: {
           id?: string
@@ -285,6 +284,7 @@ export interface Database {
           is_pinned?: boolean
           created_at?: string
           spotify_playlist_id?: string | null
+          trending_score: number | null
         }
       }
       playlist_songs: {

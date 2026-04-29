@@ -4,8 +4,20 @@ CREATE TABLE users (
     username VARCHAR(50) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    privacy VARCHAR(10) NOT NULL DEFAULT 'public' CHECK (privacy IN ('public', 'private'))
+    privacy VARCHAR(10) NOT NULL DEFAULT 'public' CHECK (privacy IN ('public', 'private')),
+    reputation NUMERIC NOT NULL DEFAULT 0
 );
+
+CREATE TABLE user_privileges (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    privilege_level SMALLINT NOT NULL CHECK (privilege_level IN (1, 2)),
+    granted_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_privileges_level ON user_privileges(privilege_level, user_id);
 
 -- Artists table
 CREATE TABLE artists (
@@ -32,7 +44,6 @@ CREATE TABLE songs (
     year_released INTEGER,
     album_id UUID REFERENCES albums(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE SET NULL,
     spotify_id VARCHAR(50)
     trending_score NUMERIC DEFAULT 0,
 );
@@ -113,6 +124,7 @@ CREATE TABLE playlists (
     is_pinned BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     spotify_playlist_id VARCHAR(50)
+    trending_score NUMERIC DEFAULT 0,
 );
 
 CREATE TABLE playlist_songs (
