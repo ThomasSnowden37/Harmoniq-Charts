@@ -12,6 +12,16 @@ import { supabase } from '../lib/supabase.js'
 
 const router = Router()
 
+async function checkIsAdmin(userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('users')
+    .select('is_admin')
+    .eq('id', userId)
+    .single();
+  
+  return data?.is_admin === true;
+}
+
 const MAX_REVIEW_LENGTH = 100
 
 function getUserId(req: any): string | null {
@@ -104,7 +114,10 @@ router.delete('/:reviewId', async (req, res) => {
     .maybeSingle()
 
   if (!existing) return res.status(404).json({ error: 'Review not found' })
-  if (existing.user_id !== userId) return res.status(403).json({ error: 'You can only delete your own reviews' })
+
+    const isOwner = existing.user_id === userId;
+    const isAdmin = await checkIsAdmin(userId);
+  if (!isOwner && !isAdmin) return res.status(403).json({ error: 'You can only delete your own reviews' })
 
   const { error } = await supabase.from('reviews').delete().eq('id', reviewId)
   if (error) return res.status(500).json({ error: error.message })

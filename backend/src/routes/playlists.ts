@@ -4,6 +4,16 @@ import { isFriend} from './friends.js'
 
 const router = Router()
 
+async function checkIsAdmin(userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('users')
+    .select('is_admin')
+    .eq('id', userId)
+    .single();
+  
+  return data?.is_admin === true;
+}
+
 function getUserId(req: any): string | null {
   return req.headers['x-user-id'] as string || null
 }
@@ -570,7 +580,10 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
     .single()
 
   if (fetchError) return res.status(404).json({ error: 'Comment not found' })
-  if (comment.user_id !== userId) return res.status(403).json({ error: 'Forbidden' })
+
+  if (comment.user_id !== userId && !(await checkIsAdmin(userId))) {
+    return res.status(403).json({ error: 'You can only delete your own comments' })
+  }
 
   const { error } = await supabase
     .from('playlist_comments')

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Box, Button, Card, Flex, Heading, Text, TextArea } from '@radix-ui/themes'
 import type { PlaylistWithSongs, PlaylistComment } from '../features/playlists/types'
-import { MOCK_CURRENT_USER_ID } from '../lib/auth'
+import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 
@@ -19,6 +19,7 @@ import Footer from '../components/Footer'
 
 export default function PlaylistPage() {
   const { playlistId } = useParams()
+  const { user } = useAuth()
   const [playlist, setPlaylist] = useState<PlaylistWithSongs | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -57,7 +58,7 @@ export default function PlaylistPage() {
     setLoading(true)
     try {
       const res = await fetch(`/api/playlists/${playlistId}`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+        headers: user?.id ? { 'x-user-id': user.id } : {}
       })
       if (res.status === 403) {
         const data = await res.json()
@@ -75,7 +76,7 @@ export default function PlaylistPage() {
   async function fetchLikes() {
     try {
       const res = await fetch(`/api/playlists/${playlistId}/likes`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+        headers: user?.id ? { 'x-user-id': user.id } : {}
       })
       if (res.ok) {
         const data = await res.json()
@@ -87,7 +88,7 @@ export default function PlaylistPage() {
   async function checkLiked() {
     try {
       const res = await fetch(`/api/playlists/${playlistId}/likes/check`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+        headers: user?.id ? { 'x-user-id': user.id } : {}
       })
       if (res.ok) {
         const data = await res.json()
@@ -102,7 +103,7 @@ export default function PlaylistPage() {
       if (liked) {
         const res = await fetch(`/api/playlists/${playlistId}/likes`, {
           method: 'DELETE',
-          headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+          headers: user?.id ? { 'x-user-id': user.id } : {}
         })
         if (res.ok) {
           setLiked(false)
@@ -111,7 +112,7 @@ export default function PlaylistPage() {
       } else {
         const res = await fetch(`/api/playlists/${playlistId}/likes`, {
           method: 'POST',
-          headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+          headers: user?.id ? { 'x-user-id': user.id } : {}
         })
         if (res.ok) {
           setLiked(true)
@@ -132,13 +133,13 @@ export default function PlaylistPage() {
   async function fetchListenedProgress() {
     try {
       const res = await fetch(`/api/playlists/${playlistId}/listened-progress`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+        headers: user?.id ? { 'x-user-id': user.id } : {}
       })
       if (res.ok) setListenedProgress(await res.json())
     } catch {}
   }
 
-  const isOwner = playlist?.user_id === MOCK_CURRENT_USER_ID
+  const isOwner = playlist?.user_id === user?.id
 
   async function handleDrop(fromIndex: number, toIndex: number) {
     if (!playlist || fromIndex === toIndex) return
@@ -154,7 +155,7 @@ export default function PlaylistPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': MOCK_CURRENT_USER_ID,
+          ...(user?.id && { 'x-user-id': user.id }),
         },
         body: JSON.stringify({ songIds: newSongs.map(s => s.id) }),
       })
@@ -172,7 +173,7 @@ export default function PlaylistPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': MOCK_CURRENT_USER_ID
+          ...(user?.id && { 'x-user-id': user.id })
         },
         body: JSON.stringify({ content: newComment })
       })
@@ -189,7 +190,7 @@ export default function PlaylistPage() {
     try {
       const res = await fetch(`/api/playlists/${playlistId}/comments/${commentId}`, {
         method: 'DELETE',
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+        headers: { ...(user?.id && { 'x-user-id': user.id }) }
       })
       if (res.ok) {
         setComments(prev => prev.filter(c => c.id !== commentId))
@@ -374,7 +375,7 @@ export default function PlaylistPage() {
                         <Text size="1" color="gray">
                           {new Date(comment.created_at).toLocaleDateString()}
                         </Text>
-                        {comment.user_id === MOCK_CURRENT_USER_ID && (
+                        {(comment.user_id === user?.id || user?.is_admin === true) && (
                           <Button
                             size="1"
                             variant="ghost"
