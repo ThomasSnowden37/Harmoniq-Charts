@@ -15,6 +15,18 @@ import * as spotify from '../lib/spotify.js'
 
 const router = Router()
 
+/** 
+ * Helper function to check if a user is an admin
+*/
+async function checkIsAdmin(userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('users')
+    .select('is_admin')
+    .eq('id', userId)
+    .single();
+  
+  return data?.is_admin === true;
+}
 
 /**
  * Get all listened to for user
@@ -235,7 +247,10 @@ router.delete('/:id', async (req, res) => {
         if (noSong) {
             return res.status(404).json({ error: 'Song is not found' })
         }
-        if (existSong.user_id != userId) {
+
+        const isOwner = existSong.user_id == userId
+        const isAdmin = await checkIsAdmin(userId);
+        if (!isOwner && !isAdmin) {
             return res.status(404).json({ error: 'You can only delete your own songs' })
         }
         //delete the song
@@ -284,8 +299,10 @@ router.patch('/:id', async (req, res) => {
         if (noSong) {
             return res.status(404).json({ error: 'Song is not found' })
         }
+        const isOwner = existSong.user_id == userId;
+        const isAdmin = await checkIsAdmin(userId);
 
-        if (existSong.user_id != userId) {
+        if (!isOwner && !isAdmin) {
             return res.status(403).json({ error: 'You can only edit your own songs' })
         }
 

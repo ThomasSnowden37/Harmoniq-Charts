@@ -259,6 +259,9 @@ useEffect(() => {
   if (!song) return <div className="min-h-screen flex flex-col bg-background"><Navbar /><main className="text-destructive p-6 text-center">Song not found</main><Footer /></div>
 
   const artists = song.song_artists?.map(sa => sa?.artists?.name).filter(Boolean) as string[] | undefined
+  const isOwner = user?.id === song?.user_id;
+  const isAdmin = user?.is_admin === true;
+  const canModify = isOwner || isAdmin;
 
   return (
     <Box className="min-h-screen flex flex-col">
@@ -310,7 +313,7 @@ useEffect(() => {
 
               <div className="mt-4 flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  {user && user.id === song.user_id && (
+                  {canModify && (
                     <>
                       <Button size="2" color="red" onClick={() => setDeleteOpen(true)}>Delete</Button>
                       <Button size="2" onClick={() => setEditOpen(true)}>Edit</Button>

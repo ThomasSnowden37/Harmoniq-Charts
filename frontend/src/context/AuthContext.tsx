@@ -69,7 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           const finalUser: GoogleUser = {
             ...googleUser,
-            name: dbUser.username
+            name: dbUser.username,
+            is_admin: dbUser.is_admin
           };
 
           setUser(finalUser);
