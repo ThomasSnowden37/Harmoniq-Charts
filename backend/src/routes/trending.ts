@@ -46,6 +46,7 @@ router.get('/playlists', async (req, res) => {
     const { data: playlists, error } = await supabase
         .from('playlists')
         .select('id, name, user_id, created_at, trending_score')
+        .or('permanent.eq.false,permanent.is.null')
         .order('trending_score', { ascending: false })
         .limit(20)
 

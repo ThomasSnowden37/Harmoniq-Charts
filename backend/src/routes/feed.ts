@@ -350,6 +350,7 @@ router.get('/playlists', async (req, res) => {
         .from('playlists')
         .select('id, user_id, name, created_at')
             .in('user_id', friendsId)
+            .or('permanent.eq.false,permanent.is.null')
             .order('created_at', { ascending : false})
             .limit(8)
 
