@@ -21,6 +21,27 @@ function getUserId(req: any): string | null {
   return req.headers['x-user-id'] as string || null
 }
 
+/**
+ * Get a user's Listen Later Playlist
+ */
+router.get('/:id/ListenLater', async (req, res) => {
+  const { id } = req.params
+
+  const { data, error } = await supabase
+    .from('playlists')
+    .select('id')
+    .eq('user_id', id)
+    .eq('permanent', true)
+    .maybeSingle()
+
+  if (error) return res.status(500).json({ error: error.message })
+  if (!data) return res.status(404).json({ error: 'Listen Later playlist not found' })
+
+  res.json(data)
+
+})
+
+
 // Get a user by ID (enforces privacy restrictions)
 router.get('/:id', async (req, res) => {
   const viewerId = getUserId(req)

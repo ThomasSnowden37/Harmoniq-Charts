@@ -90,7 +90,8 @@ export default function UserProfile() {
   const [showMutualModal, setShowMutualModal] = useState(false)
   const [favoriteSongs, setFavoriteSongs] = useState<{ id: string; song_id: string; position: number; songs: { id: string; title: string; bpm: number; genre: string; year_released: number; song_artists?: Array<{ artists?: { id: string; name: string } }> } }[]>([])
   const [showFavoritesModal, setShowFavoritesModal] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false);
+  const [listenLaterPlaylistId, setListenLaterPlaylistId] = useState<string | null>(null)
 
   function getBanStatusText(endTime?: string) {
     if (!endTime) return null
@@ -150,6 +151,7 @@ export default function UserProfile() {
     fetchLikedSongs()
     fetchUserReviews()
     fetchFavoriteSongs()
+    fetchListenLaterPlaylist()
     if (!isOwnProfile) {
       fetchRelationship()
       fetchMutualFriends()
@@ -370,6 +372,20 @@ export default function UserProfile() {
       setActionLoading(false)
     }
   }
+  // get the users Listen Later playlist
+  async function fetchListenLaterPlaylist() {
+    try {
+      const res = await fetch(`/api/users/${userId}/ListenLater`, {
+        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setListenLaterPlaylistId(data.id)
+      }
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
 
   async function handleUnban() {
     if (!user?.id) {
@@ -409,9 +425,13 @@ export default function UserProfile() {
           <Button variant="outline" onClick={() => setShowSettingsModal(true)}>
             Settings
           </Button>
-          <Button variant="outline" onClick={() => window.location.href = '/songs/listento'}>
-            Listen To
-          </Button>
+          <Button
+            variant="soft"
+            color="purple"
+            onClick={() => window.location.href = `/playlists/${listenLaterPlaylistId}`}
+          >
+          Listen Later
+</Button>
           {shareBtn}
         </Flex>
       )

@@ -57,6 +57,18 @@ router.post('/google-sync', async (req, res) => {
       .single();
 
     if (error) throw error;
+
+
+    // create the listen later playlist
+    const { error: playlistError} = await supabase
+      .from('playlists')
+      .insert({
+        user_id: newUser.id,
+        name: 'Listen Later',
+        permanent: true,
+      })
+    if (playlistError) throw playlistError;
+
     res.json({
       ...newUser,
       is_admin: false,

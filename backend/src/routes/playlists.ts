@@ -17,6 +17,7 @@ router.get('/user/:userId/count', async (req, res) => {
     .from('playlists')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
+    .or('permanent.eq.false,permanent.is.null')
 
   res.json({ playlists: count ?? 0 })
 })
@@ -29,6 +30,7 @@ router.get('/user/:userId', async (req, res) => {
     .from('playlists')
     .select('*')
     .eq('user_id', userId)
+    .or('permanent.eq.false,permanent.is.null')
     .order('created_at', { ascending: false })
 
   if (error) return res.status(500).json({ error: error.message })
