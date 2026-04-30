@@ -16,6 +16,7 @@ import {
   requireAdminUser,
   revertProposal,
 } from '../lib/proposals.js'
+import { banUser, unbanUser } from '../lib/ban.js'
 
 const router = Router()
 
@@ -195,6 +196,50 @@ router.get('/admin/reports', async (req, res) => {
     await requireAdminUser(adminId)
     const reports = await listProposalReports(typeof req.query.status === 'string' ? req.query.status : undefined)
     return res.json(reports)
+  } catch (error) {
+    const status = error instanceof Error && error.message.includes('Admin') ? 403 : 400
+    return respondError(res, error, status)
+  }
+})
+
+router.post('/admin/users/:id/ban', async (req, res) => {
+  const adminId = headerUserId(req)
+  if (!adminId) {
+    return res.status(401).json({ error: 'You must be logged in' })
+  }
+
+  try {
+    await requireAdminUser(adminId)
+
+    const endTime = typeof req.body.end_time === 'string' && req.body.end_time.trim() ? new Date(req.body.end_time).toISOString() : null
+    const durationMinutes = typeof req.body.duration_minutes === 'number'
+      ? req.body.duration_minutes
+      : typeof req.body.duration_minutes === 'string'
+      ? Number.parseInt(req.body.duration_minutes, 10)
+      : null
+
+    if (!endTime && (!durationMinutes || Number.isNaN(durationMinutes) || durationMinutes <= 0)) {
+      return res.status(400).json({ error: 'Missing ban duration or valid end time' })
+    }
+
+    const ban = await banUser(req.params.id, { endTime: endTime ?? undefined, durationMinutes: durationMinutes ?? undefined })
+    return res.status(201).json(ban)
+  } catch (error) {
+    const status = error instanceof Error && error.message.includes('Admin') ? 403 : 400
+    return respondError(res, error, status)
+  }
+})
+
+router.delete('/admin/users/:id/ban', async (req, res) => {
+  const adminId = headerUserId(req)
+  if (!adminId) {
+    return res.status(401).json({ error: 'You must be logged in' })
+  }
+
+  try {
+    await requireAdminUser(adminId)
+    await unbanUser(req.params.id)
+    return res.json({ success: true })
   } catch (error) {
     const status = error instanceof Error && error.message.includes('Admin') ? 403 : 400
     return respondError(res, error, status)

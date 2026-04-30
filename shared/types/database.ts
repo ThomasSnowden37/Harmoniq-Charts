@@ -153,6 +153,7 @@ export interface Database {
           song_id: string
           content: string
           created_at: string
+          trending_score: number | null
         }
         Insert: {
           id?: string
@@ -160,6 +161,7 @@ export interface Database {
           song_id: string
           content: string
           created_at?: string
+          trending_score: number | null
         }
         Update: {
           id?: string
@@ -167,6 +169,7 @@ export interface Database {
           song_id?: string
           content?: string
           created_at?: string
+          trending_score: number | null
         }
       }
       likes: {

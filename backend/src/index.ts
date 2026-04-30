@@ -17,6 +17,7 @@ import favoriteSongsRouter from './routes/favoriteSongs.js'
 import feedRouter from './routes/feed.js'
 import topAlbumsRouter from './routes/topAlbums.js'
 import proposalsRouter from './routes/proposals.js'
+import { rejectIfBanned } from './lib/ban.js'
 
 dotenv.config()
 
@@ -25,6 +26,15 @@ const PORT = process.env.PORT || 3001
 
 app.use(cors())
 app.use(express.json())
+
+app.use(async (req, res, next) => {
+  const userId = req.headers['x-user-id'] as string | null
+  if (!userId) return next()
+  if (req.method === 'GET' || req.method === 'HEAD') return next()
+
+  if (await rejectIfBanned(res, userId)) return
+  next()
+})
 
 // Define all routes in the routes subfolder here
 app.use('/api/friend-requests', friendRequestsRouter)

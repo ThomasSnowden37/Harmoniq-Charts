@@ -19,7 +19,7 @@ const NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
 router.post('/google-sync', async (req, res) => {
   // Destructure the keys coming from the frontend AuthContext
-  const { id, email, username } = req.body;
+  const { id, email, username, picture_url: requestedPictureUrl } = req.body;
 
   // Check if 'id' (the Google sub) exists before hashing
   if (!id) {
@@ -29,10 +29,11 @@ router.post('/google-sync', async (req, res) => {
   try {
     // Generate the UUID
     const userUuid = uuidv5(id, NAMESPACE);
+    const defaultPictureUrl = requestedPictureUrl || null;
 
     const { data: existingUser, error: existingUserError } = await supabase
       .from('users')
-      .select('id, username, email, privacy, created_at')
+      .select('id, username, email, privacy, created_at, picture_url')
       .eq('id', userUuid)
       .maybeSingle();
 
@@ -52,8 +53,9 @@ router.post('/google-sync', async (req, res) => {
         email: email, 
         username: username, 
         privacy: 'public',
+        picture_url: defaultPictureUrl || null,
       })
-      .select('id, username, email, privacy, created_at')
+      .select('id, username, email, privacy, created_at, picture_url')
       .single();
 
     if (error) throw error;

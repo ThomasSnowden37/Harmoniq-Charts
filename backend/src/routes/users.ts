@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { isAdminUser } from '../lib/admin.js'
 import { supabase } from '../lib/supabase.js'
+import { getActiveBan } from '../lib/ban.js'
 import { isFriend } from './friends.js'
 
 /**
@@ -48,15 +49,18 @@ router.get('/:id', async (req, res) => {
 
   const { data, error } = await supabase
     .from('users')
-    .select('id, username, email, privacy, reputation, created_at')
+    .select('id, username, email, privacy, reputation, created_at, picture_url')
     .eq('id', profileId)
     .single()
 
   if (error) return res.status(404).json({ error: 'User not found' })
 
+  const activeBan = await getActiveBan(profileId)
   const response = {
     ...data,
     is_admin: await isAdminUser(profileId),
+    is_banned: Boolean(activeBan),
+    ban_end_time: activeBan?.end_time ?? null,
   }
 
   // Public profiles, own profile, or no viewer — return full data
@@ -82,25 +86,55 @@ router.patch('/:id', async (req, res) => {
   if (!userId) return res.status(401).json({ error: 'Missing x-user-id header' })
   if (userId !== req.params.id) return res.status(403).json({ error: 'You can only update your own profile' })
 
-  const { privacy, username } = req.body
+  const { privacy, username, picture_url } = req.body
   
   // Create an object with only the fields provided in the request
   const updates: any = {}
   if (privacy && ['public', 'private'].includes(privacy)) updates.privacy = privacy
   if (username && username.trim().length > 0) updates.username = username.trim()
+  if (picture_url !== undefined) updates.picture_url = typeof picture_url === 'string' ? picture_url.trim() || null : null
 
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'No valid fields provided for update' })
   }
 
+  // Fetch the user's CURRENT data
+  const { data: currentUser, error: fetchError } = await supabase
+    .from('users')
+    .select('picture_url')
+    .eq('id', userId)
+    .single()
+
+  if (fetchError) return res.status(500).json({ error: fetchError.message })
+  const oldPictureUrl = currentUser?.picture_url
+
   const { data, error } = await supabase
     .from('users')
     .update(updates)
     .eq('id', userId)
-    .select('id, username, email, privacy, reputation, created_at')
+    .select('id, username, email, privacy, reputation, created_at, picture_url')
     .single()
 
   if (error) return res.status(500).json({ error: error.message })
+
+  if (picture_url !== undefined && oldPictureUrl && oldPictureUrl !== updates.picture_url) {
+    const bucketMarker = '/public/profile_picture/'
+    const urlParts = oldPictureUrl.split(bucketMarker)
+
+    if (urlParts.length === 2) {
+      const oldFilePath = urlParts[1]
+      
+      const { error: deleteError } = await supabase
+        .storage
+        .from('profile_picture')
+        .remove([oldFilePath])
+
+      if (deleteError) {
+        console.error('Failed to clean up old profile picture from storage:', deleteError)
+      }
+    }
+  }
+
   res.json({
     ...data,
     is_admin: await isAdminUser(userId),

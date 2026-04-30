@@ -140,6 +140,20 @@ interface trendingPlaylist {
     username: string
 }
 
+interface trendingReview {
+    id: string
+    content: string
+    created_at: string
+    user_id: string
+    friend_name: string
+    trending_score: number
+    song: {
+        id: string
+        title:string
+    }
+    
+}
+
 export default function FeedSongs() {
     const [loading, setLoading] = useState(true)
     const [feed, setFeed] = useState<Feeds[]>([])
@@ -148,6 +162,7 @@ export default function FeedSongs() {
     const [friendReviews, setfriendReviews] = useState<songReview[]>([])
     const [friendPlaylists, setfriendPlaylists] = useState<friendPlaylist[]>([])
     const [trendingPlaylist, setTrendingPlaylist] = useState<trendingPlaylist[]>([])
+    const [trendingReviews, setTrendingReviews] = useState<trendingReview[]>([])
     const { user } = useAuth()
   
     const navigate = useNavigate();
@@ -217,6 +232,14 @@ useEffect(() => {
         }
         setTrendingPlaylist(trendingPData)
 
+        const revTrending = await fetch(`http://localhost:3001/api/trending/reviews`)
+        const revtrendingData = await revTrending.json()
+        if (!revTrending.ok) {
+            setError(revtrendingData.error || 'Failed to load trending')
+            return
+        }
+        setTrendingReviews(revtrendingData.slice(0, 6))
+
         } catch (err) {
             console.error(err)
             setError('Failed to fetch friends songs')
@@ -228,6 +251,47 @@ useEffect(() => {
       fetchFeed()
     }, [user])
 
+
+    if (loading) {
+        return (
+            <div>
+            <Navbar />
+            <div className="min-h-screen w-full flex items-center justify-center bg-background">
+                <p className="text-lg text-muted-foreground">Loading...</p>
+            </div>
+            <Footer />
+            </div>
+        )
+    }
+
+    function ReviewCard({ review }: { review: any }) {
+        return (
+            <div className="w-56 rounded-2xl border border-border bg-card p-4 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all">
+            <div className="flex flex-col gap-1 mb-2">
+                <a
+                href={`/user/${review.user_id}`}
+                className="text-xs font-semibold text-primary underline"
+                >
+                {review.friend_name}
+                </a>
+
+                <span className="text-xs text-muted-foreground">
+                {new Date(review.created_at).toLocaleDateString()}
+                </span>
+            </div>
+
+            <button
+                onClick={() => navigate(`/songs/${review.song.id}`)}
+                className="text-base font-bold text-foreground hover:text-primary mb-2"
+            >
+                {review.song.title}
+            </button>
+
+            <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                {review.content}
+            </p>
+            </div>
+        )}
     return (
         <div>
             <Navbar />
@@ -241,7 +305,7 @@ useEffect(() => {
                     <a href="/feed/all" className="text-sm text-primary underline">See all</a>
                 </div>
 
-                {loading && <p className="text-muted-foreground">Loading...</p>}
+
                 {!loading && feed.length === 0 && <p className="text-muted-foreground">No recent activity. Try adding some more friends</p>}
 
                 {!loading && feed.length > 0 && (
@@ -303,88 +367,60 @@ useEffect(() => {
                         </ul>
                     </div>
                 )}
-                {/* Friend Recent Reviews */}
-                <div className="w-full flex justify-center mt-16 mb-4">
-                <h1 className="text-3xl font-semibold text-primary text-center">
+                {/* Reviews */}
+                <div className="w-full max-w-7xl grid grid-cols-2 gap-8 mt-16 items-start">
+
+                {/* Friend Reviews */}
+                <section className="flex flex-col items-center">
+                    <h1 className="text-2xl font-semibold text-primary text-center mb-8">
                     Friend Recent Reviews
-                </h1>
-                </div>
+                    </h1>
 
-                {!loading && friendReviews.length === 0 && (
-                <p className="text-muted-foreground">No recent friend reviews.</p>
-                )}
-
-                {!loading && friendReviews.length > 0 && (
-                <div className="w-full max-w-6xl flex justify-center mt-8">
-                    <div className="grid grid-cols-2 gap-x-24">
-                        <div className="flex flex-col gap-16">
-                            {friendReviews.filter((_, index) => index % 2 === 0).map(review => (
-                            <div
-                                key={review.id}
-                                className="w-80 rounded-xl border border-border bg-card p-4 shadow-sm"
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <a
-                                        href={`/user/${review.user_id}`}
-                                        className="text-sm font-semibold text-primary underline"
-                                    >
-                                        {review.friend_name}
-                                    </a>
-
-                                    <span className="text-xs text-muted-foreground">
-                                        {new Date(review.created_at).toLocaleDateString()}
-                                    </span>
-                                </div>
-
-                                <button
-                                    onClick={() => navigate(`/songs/${review.song.id}`)}
-                                    className="text-left text-lg font-bold text-foreground hover:text-primary mb-2"
-                                >
-                                    {review.song.title}
-                                </button>
-
-                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {review.content}
-                                </p>
-                            </div>
-                            ))}
+                    {friendReviews.length === 0 ? (
+                    <p className="text-muted-foreground">No recent friend reviews.</p>
+                    ) : (
+                    <div className="grid grid-cols-2 gap-x-4">
+                        <div className="flex flex-col gap-10">
+                        {friendReviews.filter((_, index) => index % 2 === 0).map(review => (
+                            <ReviewCard key={review.id} review={review} />
+                        ))}
                         </div>
 
-                        <div className="flex flex-col gap-16 mt-12">
-                            {friendReviews.filter((_, index) => index % 2 === 1).map(review => (
-                            <div
-                                key={review.id}
-                                className="w-80 rounded-xl border border-border bg-card p-4 shadow-sm"
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <a
-                                        href={`/user/${review.user_id}`}
-                                        className="text-sm font-semibold text-primary underline"
-                                    >
-                                        {review.friend_name}
-                                    </a>
-
-                                    <span className="text-xs text-muted-foreground">
-                                        {new Date(review.created_at).toLocaleDateString()}
-                                    </span>
-                                </div>
-
-                                <button
-                                    onClick={() => navigate(`/songs/${review.song.id}`)}
-                                    className="text-left text-lg font-bold text-foreground hover:text-primary mb-2"
-                                >
-                                    {review.song.title}
-                                </button>
-
-                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                    {review.content}
-                                </p>
-                            </div>
-                            ))}
+                        <div className="flex flex-col gap-10 mt-10">
+                        {friendReviews.filter((_, index) => index % 2 === 1).map(review => (
+                            <ReviewCard key={review.id} review={review} />
+                        ))}
                         </div>
                     </div>
+                    )}
+                </section>
+
+                {/* Trending Reviews */}
+                <section className="flex flex-col items-center">
+                    <h1 className="text-2xl font-semibold text-primary text-center mb-8">
+                    Trending Reviews
+                    </h1>
+
+                    {trendingReviews.length === 0 ? (
+                    <p className="text-muted-foreground">No trending reviews.</p>
+                    ) : (
+                    <div className="grid grid-cols-2 gap-x-4">
+                        <div className="flex flex-col gap-10">
+                        {trendingReviews.filter((_, index) => index % 2 === 0).map(review => (
+                            <ReviewCard key={review.id} review={review} />
+                        ))}
+                        </div>
+
+                        <div className="flex flex-col gap-10 mt-10">
+                        {trendingReviews.filter((_, index) => index % 2 === 1).map(review => (
+                            <ReviewCard key={review.id} review={review} />
+                        ))}
+                        </div>
+                    </div>
+                    )}
+                </section>
+
                 </div>
-                )}
                 {/* Friend Playlists */}
                 <div className="w-full flex justify-center mt-16 mb-4">
                     <h1 className="text-3xl font-semibold text-primary text-center">

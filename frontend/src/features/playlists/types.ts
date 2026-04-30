@@ -11,6 +11,7 @@ export interface Playlist {
 
 export interface PlaylistWithSongs extends Playlist {
   users?: { username: string }
+  permanent?: boolean
   songs: PlaylistSong[]
 }
 

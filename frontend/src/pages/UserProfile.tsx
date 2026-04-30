@@ -5,6 +5,7 @@ import FriendsModal from '../features/friends/components/FriendsModal'
 import SettingsModal from '../features/settings/components/SettingsModal'
 import PlaylistSection from '../features/playlists/components/PlaylistSection'
 import DeleteUserModal from '../features/users/components/DeleteUserModal'
+import BanUserModal from '../features/users/components/BanUserModal'
 import ManageFavoritesModal from '../features/songs/components/ManageFavoritesModal'
 import MutualFriendsModal from '../features/friends/components/MutualFriendsModal'
 import UserProposalsPanel from '../features/proposals/components/UserProposalsPanel'
@@ -27,6 +28,8 @@ import {
 import { Share2, Check } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { useAuth } from '../context/AuthContext'
+import { unbanUser } from '../features/users/api'
 
 type RelationshipStatus = 'none' | 'friends' | 'outgoing_pending' | 'incoming_pending'
 
@@ -35,8 +38,11 @@ interface ProfileUser {
   username: string
   privacy: PrivacySetting
   reputation?: number
+  picture_url?: string
   isAdmin?: boolean
   restricted?: boolean
+  isBanned?: boolean
+  banEndTime?: string
 }
 
 interface RelationshipData {
@@ -66,12 +72,16 @@ export default function UserProfile() {
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showFriendsModal, setShowFriendsModal] = useState(false)
+  const { user } = useAuth()
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showBanModal, setShowBanModal] = useState(false)
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [playlistCount, setPlaylistCount] = useState(0)
   const [playlistsLoaded, setPlaylistsLoaded] = useState(false)
   const [activeTab, setActiveTab] = useState<string>('reviews')
   const [friendCount, setFriendCount] = useState(0)
+  const currentUserId = user?.id ?? MOCK_CURRENT_USER_ID
+  const isOwnProfile = userId === currentUserId
   const [likedSongs, setLikedSongs] = useState<{ id: string; title: string; genre: string; year_released: number; bpm: number }[]>([])
   const [userReviews, setUserReviews] = useState<{ id: string; content: string; created_at: string; song_id: string; songs: { id: string; title: string; genre: string; year_released: number } }[]>([])
   const [deleteUserModal, setDeleteUserModal] = useState(false)
@@ -84,7 +94,26 @@ export default function UserProfile() {
   const [copied, setCopied] = useState(false);
   const [listenLaterPlaylistId, setListenLaterPlaylistId] = useState<string | null>(null)
 
-    const isOwnProfile = userId === MOCK_CURRENT_USER_ID
+  function getBanStatusText(endTime?: string) {
+    if (!endTime) return null
+    const end = new Date(endTime)
+    const now = new Date()
+    const diffMs = end.getTime() - now.getTime()
+    if (diffMs <= 0) return 'Ban expires soon'
+
+    const totalMinutes = Math.floor(diffMs / 60000)
+    const days = Math.floor(totalMinutes / 1440)
+    const hours = Math.floor((totalMinutes % 1440) / 60)
+    const minutes = totalMinutes % 60
+
+    if (days > 0) {
+      return `${days} day${days === 1 ? '' : 's'} ${hours}h ${minutes}m remaining`
+    }
+    if (hours > 0) {
+      return `${hours}h ${minutes}m remaining`
+    }
+    return `${minutes} minute${minutes === 1 ? '' : 's'} remaining`
+  }
 
   // Handle Spotify OAuth callback query params
   useEffect(() => {
@@ -143,13 +172,16 @@ export default function UserProfile() {
     setLoading(true)
     try {
       const res = await fetch(`/api/users/${userId}`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+        headers: { 'x-user-id': currentUserId },
       })
       if (!res.ok) throw new Error('User not found')
       const data = await res.json()
       setProfileUser({
         ...data,
+        picture_url: data.picture_url,
         isAdmin: Boolean(data.is_admin),
+        isBanned: Boolean(data.is_banned),
+        banEndTime: data.ban_end_time,
       })
     } catch (err: any) {
       setError(err.message)
@@ -161,7 +193,7 @@ export default function UserProfile() {
   async function fetchFriendCount() {
     try {
       const res = await fetch('/api/friend-requests/friends', {
-        headers: { 'x-user-id': userId! },
+        headers: { 'x-user-id': currentUserId },
       })
       if (res.ok) {
         const data = await res.json()
@@ -193,7 +225,7 @@ export default function UserProfile() {
   async function fetchPlaylists() {
     try {
       const res = await fetch(`/api/playlists/user/${userId}`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID }
+        headers: { 'x-user-id': currentUserId }
       })
       if (res.ok) {
         const data = await res.json()
@@ -209,7 +241,7 @@ export default function UserProfile() {
   async function fetchSpotifyInfo() {
     try {
       const res = await fetch(`/api/users/${userId}/spotify`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+        headers: { 'x-user-id': currentUserId },
       })
       if (res.ok) {
         const data = await res.json()
@@ -234,7 +266,7 @@ export default function UserProfile() {
   async function fetchMutualFriends() {
     try {
       const res = await fetch(`/api/friend-requests/mutual/${userId}`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+        headers: { 'x-user-id': currentUserId },
       })
       if (res.ok) setMutualFriends(await res.json())
     } catch (err) {
@@ -255,7 +287,7 @@ export default function UserProfile() {
   async function fetchRelationship() {
     try {
       const res = await fetch(`/api/friend-requests/status/${userId}`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+        headers: { 'x-user-id': currentUserId },
       })
       if (!res.ok) throw new Error('Failed to fetch relationship')
       const data = await res.json()
@@ -273,7 +305,7 @@ export default function UserProfile() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': MOCK_CURRENT_USER_ID,
+          'x-user-id': currentUserId,
         },
         body: JSON.stringify({ addressee_id: userId }),
       })
@@ -296,7 +328,7 @@ export default function UserProfile() {
     try {
       const res = await fetch(`/api/friend-requests/${relationship.request.id}`, {
         method: 'DELETE',
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+        headers: { 'x-user-id': currentUserId },
       })
       if (!res.ok) throw new Error('Failed to cancel request')
       setRelationship({ status: 'none' })
@@ -314,7 +346,7 @@ export default function UserProfile() {
     try {
       const res = await fetch(`/api/friend-requests/${relationship.request.id}/accept`, {
         method: 'PATCH',
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+        headers: { 'x-user-id': currentUserId },
       })
       if (!res.ok) throw new Error('Failed to accept request')
       await fetchRelationship()
@@ -331,7 +363,7 @@ export default function UserProfile() {
     try {
       const res = await fetch(`/api/friend-requests/unfriend/${userId}`, {
         method: 'DELETE',
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+        headers: { 'x-user-id': currentUserId },
       })
       if (!res.ok) throw new Error('Failed to unfriend')
       setRelationship({ status: 'none' })
@@ -346,7 +378,7 @@ export default function UserProfile() {
   async function fetchListenLaterPlaylist() {
     try {
       const res = await fetch(`/api/users/${userId}/ListenLater`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+        headers: { 'x-user-id': currentUserId },
       })
       if (res.ok) {
         const data = await res.json()
@@ -354,6 +386,24 @@ export default function UserProfile() {
       }
     } catch (err: any) {
       setError(err.message)
+    }
+  }
+
+  async function handleUnban() {
+    if (!user?.id) {
+      setError('Admin access required to unban users')
+      return
+    }
+
+    setActionLoading(true)
+    setError(null)
+    try {
+      await unbanUser(userId!, currentUserId)
+      await fetchProfile()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -383,44 +433,67 @@ export default function UserProfile() {
             onClick={() => window.location.href = `/playlists/${listenLaterPlaylistId}`}
           >
           Listen Later
-</Button>
+          </Button>
           {shareBtn}
         </Flex>
       )
     }
 
+    const adminActions = user?.isAdmin && !isOwnProfile ? (
+      <Flex gap="2" wrap="wrap" className="mt-2">
+        <Button variant="soft" color="red" onClick={() => setShowBanModal(true)}>
+          {profileUser?.isBanned ? 'Update Ban' : 'Ban'}
+        </Button>
+        {profileUser?.isBanned && (
+          <Button variant="outline" color="green" onClick={handleUnban} disabled={actionLoading}>
+            {actionLoading ? 'Working...' : 'Lift Ban'}
+          </Button>
+        )}
+      </Flex>
+    ) : null
+
     return (
-      <Flex gap="2" wrap="wrap">
-        {(() => {
-          switch (relationship.status) {
-            case 'none':
-              return (
-                <Button onClick={sendFriendRequest} disabled={actionLoading}>
-                  {actionLoading ? 'Sending...' : 'Add Friend'}
-                </Button>
-              )
-            case 'outgoing_pending':
-              return (
-                <Button variant="soft" color="orange" onClick={cancelRequest} disabled={actionLoading}>
-                  {actionLoading ? 'Cancelling...' : 'Pending - Cancel Request'}
-                </Button>
-              )
-            case 'incoming_pending':
-              return (
-                <Button color="green" onClick={acceptRequest} disabled={actionLoading}>
-                  {actionLoading ? 'Accepting...' : 'Accept Friend Request'}
-                </Button>
-              )
-            case 'friends':
-              return (
-                <Button color="red" variant="soft" onClick={unfriend} disabled={actionLoading}>
-                  {actionLoading ? 'Unfollowing...' : 'Unfollow'}
-                </Button>
-              )
-            default:
-              return null;
-          }
-        })()}
+      <Flex direction="column" gap="3">
+        <Flex gap="2" wrap="wrap">
+          <Button
+            variant="soft"
+            color="purple"
+            onClick={() => window.location.href = `/playlists/${listenLaterPlaylistId}`}
+          >
+          Listen Later
+          </Button>
+          {user && (() => {
+            switch (relationship.status) {
+              case 'none':
+                return (
+                  <Button onClick={sendFriendRequest} disabled={actionLoading}>
+                    {actionLoading ? 'Sending...' : 'Add Friend'}
+                  </Button>
+                )
+              case 'outgoing_pending':
+                return (
+                  <Button variant="soft" color="orange" onClick={cancelRequest} disabled={actionLoading}>
+                    {actionLoading ? 'Cancelling...' : 'Pending - Cancel Request'}
+                  </Button>
+                )
+              case 'incoming_pending':
+                return (
+                  <Button color="green" onClick={acceptRequest} disabled={actionLoading}>
+                    {actionLoading ? 'Accepting...' : 'Accept Friend Request'}
+                  </Button>
+                )
+              case 'friends':
+                return (
+                  <Button color="red" variant="soft" onClick={unfriend} disabled={actionLoading}>
+                    {actionLoading ? 'Unfollowing...' : 'Unfollow'}
+                  </Button>
+                )
+              default:
+                return null;
+            }
+          })()}
+        </Flex>
+        {adminActions}
       </Flex>
     )
   }
@@ -460,6 +533,7 @@ export default function UserProfile() {
 
   const isRestricted = !isOwnProfile && profileUser?.restricted
   const initials = profileUser?.username?.slice(0, 2).toUpperCase() ?? '??'
+  const profileImageUrl = profileUser?.picture_url ?? (isOwnProfile ? user?.picture : undefined)
 
   return (
     <Box className="min-h-screen bg-background flex flex-col">
@@ -491,6 +565,7 @@ export default function UserProfile() {
           <Flex align="center" gap="5">
             <Avatar
               size="7"
+              src={profileImageUrl}
               fallback={initials}
               variant="solid"
             />
@@ -527,6 +602,19 @@ export default function UserProfile() {
                       {spotifyInfo.displayName || 'Spotify'}
                     </Badge>
                   </Link>
+                )}
+                {profileUser?.isBanned && (
+                  <Box mt="3">
+                    <Badge variant="soft" color="red">
+                      {isOwnProfile ? 'Your account is suspended until' : 'Banned until'} {' '}
+                      {profileUser?.banEndTime ? new Date(profileUser.banEndTime).toLocaleString() : 'unknown'}
+                    </Badge>
+                    {profileUser?.banEndTime && (
+                      <Text size="1" color="red" className="mt-2 block">
+                        {getBanStatusText(profileUser.banEndTime)}
+                      </Text>
+                    )}
+                  </Box>
                 )}
               </Flex>
               <Box mt="3">
@@ -739,7 +827,7 @@ export default function UserProfile() {
 
             {isOwnProfile && (
               <Tabs.Content value="contributions">
-                <UserProposalsPanel userId={userId!} viewerId={MOCK_CURRENT_USER_ID} reputation={profileUser?.reputation ?? 0} />
+                <UserProposalsPanel userId={userId!} viewerId={currentUserId} reputation={profileUser?.reputation ?? 0} />
               </Tabs.Content>
             )}
           </Tabs.Root>
@@ -757,9 +845,9 @@ export default function UserProfile() {
           onClose={() => setShowSettingsModal(false)}
           currentPrivacy={profileUser.privacy}
           onPrivacyChange={handlePrivacyChange}
-          // Add these two new props:
           currentUsername={profileUser.username}
           onUsernameChange={(newUsername) => setProfileUser({ ...profileUser, username: newUsername })}
+          onPictureUrlChange={(url) => setProfileUser((prev) => prev ? { ...prev, picture_url: url } : prev)}
           onDeleteAccount={() => {
             setShowSettingsModal(false)
             setDeleteUserModal(true)
@@ -773,6 +861,14 @@ export default function UserProfile() {
         onDeleted={() => {
           window.location.href = '/'
         }}
+      />
+
+      <BanUserModal
+        isOpen={showBanModal}
+        onClose={() => setShowBanModal(false)}
+        targetUserId={userId ?? ''}
+        adminUserId={currentUserId}
+        onBanned={fetchProfile}
       />
 
       {isOwnProfile && (

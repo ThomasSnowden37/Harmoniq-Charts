@@ -19,6 +19,18 @@ CREATE TABLE user_privileges (
 
 CREATE INDEX idx_user_privileges_level ON user_privileges(privilege_level, user_id);
 
+CREATE TABLE banned_users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX idx_banned_users_user_end_time ON banned_users(user_id, end_time);
+
+ALTER TABLE banned_users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations on banned_users" ON banned_users FOR ALL USING (true) WITH CHECK (true);
+
 -- Artists table
 CREATE TABLE artists (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,8 +56,8 @@ CREATE TABLE songs (
     year_released INTEGER,
     album_id UUID REFERENCES albums(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    spotify_id VARCHAR(50)
-    trending_score NUMERIC DEFAULT 0,
+    spotify_id VARCHAR(50),
+    trending_score NUMERIC DEFAULT 0
 );
 
 -- MANY TO MANY TABLES
@@ -78,6 +90,7 @@ CREATE TABLE reviews (
     song_id UUID REFERENCES songs(id) ON DELETE CASCADE NOT NULL,
     content TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    trending_score NUMERIC DEFAULT 0,
     UNIQUE(user_id, song_id) -- One review per user per song
 );
 

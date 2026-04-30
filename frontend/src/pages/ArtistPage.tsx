@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Box, Button, Card, Flex, Heading, Text } from '@radix-ui/themes'
-import { PencilLine } from 'lucide-react'
+import { PencilLine, Clock, Headphones, Heart } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useAuth } from '../context/AuthContext'
@@ -39,6 +39,11 @@ export default function ArtistPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [linkModalOpen, setLinkModalOpen] = useState(false)
+  const [songActions, setSongAction] = useState<Record<string, {
+    listened: boolean
+    listento: boolean
+    liked: boolean
+  }>>({})
 
   useEffect(() => {
     if (!artistId) return
@@ -83,6 +88,31 @@ export default function ArtistPage() {
 
         setArtist(artistResult.data as Artist)
         setSongs(nextSongs)
+        if (user) {
+          const statusEntries = await Promise.all(
+            nextSongs.map(async song => {
+              const res = await fetch(`/api/songs/${song.id}/status`, {
+                headers: { 'x-user-id': user.id }
+              })
+
+              if (!res.ok) {
+                return [song.id, { listened: false, listento: false, liked: false }]
+              }
+
+              const data = await res.json()
+
+              return [
+                song.id,
+                {
+                  listened: data.listened ?? false,
+                  listento: data.listento ?? false,
+                  liked: data.liked ?? false
+                }
+              ]
+            })
+          )
+          setSongAction(Object.fromEntries(statusEntries))
+        }
         setAlbums(dedupedAlbums)
       } catch (err) {
         console.error(err)
@@ -91,7 +121,72 @@ export default function ArtistPage() {
         setLoading(false)
       }
     })()
-  }, [artistId])
+  }, [artistId, user])
+
+  async function songAction(
+    e: React.MouseEvent,
+    songId: string,
+    action: 'listento' | 'listened' | 'like'
+  ) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const userId = user?.id
+    if (!userId) {
+      alert('You must be logged in')
+      return
+    }
+
+    const current = songActions[songId] ?? {
+      listened: false,
+      listento: false,
+      liked: false
+    }
+
+    const key = action === 'like' ? 'liked' : action
+    const wasActive = current[key]
+    const optimistic = !wasActive
+
+    setSongAction(prev => ({
+      ...prev,
+      [songId]: {
+        ...current,
+        [key]: optimistic
+      }
+  }))
+
+  try {
+    const method = optimistic ? 'POST' : 'DELETE'
+    const url =
+      action === 'like'
+        ? `/api/likes/${songId}`
+        : `/api/songs/${songId}/${action}`
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'x-user-id': userId }
+    })
+
+    if (!res.ok) {
+      setSongAction(prev => ({
+        ...prev,
+        [songId]: {
+          ...current,
+          [key]: wasActive
+        }
+      }))
+    }
+  } catch (err) {
+    setSongAction(prev => ({
+      ...prev,
+      [songId]: {
+        ...current,
+        [key]: wasActive
+      }
+    }))
+    console.error(err)
+  }
+}
 
   if (loading) return <div className="min-h-screen flex flex-col"><Navbar /><main className="p-6 text-center">Loading...</main><Footer /></div>
   if (error) return <div className="min-h-screen flex flex-col"><Navbar /><main className="p-6 text-center text-destructive">{error}</main><Footer /></div>
@@ -140,7 +235,14 @@ export default function ArtistPage() {
           <Card size="3" mb="5"><Text color="gray">No songs for this artist yet.</Text></Card>
         ) : (
           <Flex direction="column" gap="2" mb="6">
-            {songs.map((song, index) => (
+            {songs.map((song, index) => {
+            const status = songActions[song.id] ?? {
+              listened: false,
+              listento: false,
+              liked: false,
+            }
+
+            return (
               <Link key={song.id} to={`/songs/${song.id}`} className="no-underline">
                 <Card size="2">
                   <Flex justify="between" align="center" gap="3">
@@ -161,10 +263,42 @@ export default function ArtistPage() {
                         )
                       })()}
                     </div>
+
+                    {user && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="1"
+                          variant={status.listento ? 'solid' : 'ghost'}
+                          color={status.listento ? 'green' : 'gray'}
+                          onClick={(e) => songAction(e, song.id, 'listento')}
+                        >
+                          <Clock className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          size="1"
+                          variant={status.listened ? 'solid' : 'ghost'}
+                          color={status.listened ? 'green' : 'gray'}
+                          onClick={(e) => songAction(e, song.id, 'listened')}
+                        >
+                          <Headphones className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          size="1"
+                          variant={status.liked ? 'solid' : 'ghost'}
+                          color={status.liked ? 'red' : 'gray'}
+                          onClick={(e) => songAction(e, song.id, 'like')}
+                        >
+                          <Heart className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
                   </Flex>
                 </Card>
               </Link>
-            ))}
+            )
+          })}
           </Flex>
         )}
 

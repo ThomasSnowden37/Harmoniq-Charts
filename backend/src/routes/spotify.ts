@@ -11,6 +11,7 @@ import * as spotify from '../lib/spotify.js'
 import { detectDuplicateCandidates, proposalHighConfidenceMatchThreshold } from '../lib/proposals.js'
 import { determineTrackTempo, fetchReccoBeatsTempo } from '../lib/tempo.js'
 import { fetchAllPlaylistTracks, normalizePlaylistItems } from '../lib/playlist.js'
+import { rejectIfBanned } from '../lib/ban.js'
 import crypto from 'crypto'
 
 const router = Router()
@@ -230,11 +231,13 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
  * GET /auth/url
  * Generate Spotify OAuth authorization URL
  */
-router.get('/auth/url', (req: Request, res: Response) => {
+router.get('/auth/url', async (req: Request, res: Response) => {
   const userId = getUserId(req)
   if (!userId) {
     return res.status(401).json({ error: 'Authentication required' })
   }
+
+  if (await rejectIfBanned(res, userId)) return
 
   // Use userId as state to verify callback (URL-safe base64)
   const state = Buffer.from(JSON.stringify({ userId, ts: Date.now() }))
@@ -279,6 +282,8 @@ router.get('/auth/callback', async (req: Request, res: Response) => {
     if (!userId) {
       throw new Error('Invalid state: missing userId')
     }
+
+    if (await rejectIfBanned(res, userId)) return
 
     // Exchange code for tokens
     const tokens = await spotify.exchangeCode(code as string)
@@ -325,6 +330,8 @@ router.get('/connection-status', async (req: Request, res: Response) => {
   if (!userId) {
     return res.status(401).json({ error: 'Authentication required' })
   }
+
+  if (await rejectIfBanned(res, userId)) return
 
   const { data, error } = await supabase
     .from('user_spotify_tokens')
@@ -380,6 +387,8 @@ router.get('/playlists', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Authentication required' })
   }
 
+  if (await rejectIfBanned(res, userId)) return
+
   const accessToken = await getValidAccessToken(userId)
   if (!accessToken) {
     return res.status(401).json({ error: 'Spotify not connected or token expired' })
@@ -406,6 +415,8 @@ router.get('/playlists/:playlistId/tracks', async (req: Request, res: Response) 
     return res.status(401).json({ error: 'Authentication required' })
   }
 
+  if (await rejectIfBanned(res, userId)) return
+
   const accessToken = await getValidAccessToken(userId)
   if (!accessToken) {
     return res.status(401).json({ error: 'Spotify not connected or token expired' })
@@ -429,6 +440,7 @@ router.get('/playlists/:playlistId/tracks', async (req: Request, res: Response) 
  */
 router.get('/search', async (req: Request, res: Response) => {
   const userId = getUserId(req)
+  if (userId && (await rejectIfBanned(res, userId))) return
   const accessToken = await getRequestSpotifyAccessToken(userId)
   if (!accessToken) {
     return res.status(503).json({ error: 'Spotify lookup is currently unavailable' })
@@ -462,6 +474,7 @@ router.get('/search', async (req: Request, res: Response) => {
 
 router.get('/search/entities', async (req: Request, res: Response) => {
   const userId = getUserId(req)
+  if (userId && (await rejectIfBanned(res, userId))) return
   const accessToken = await getRequestSpotifyAccessToken(userId)
   if (!accessToken) {
     return res.status(503).json({ error: 'Spotify lookup is currently unavailable' })
@@ -507,6 +520,7 @@ router.get('/search/entities', async (req: Request, res: Response) => {
 
 router.get('/entities/:type/:entityId', async (req: Request, res: Response) => {
   const userId = getUserId(req)
+  if (userId && (await rejectIfBanned(res, userId))) return
   const accessToken = await getRequestSpotifyAccessToken(userId)
   if (!accessToken) {
     return res.status(503).json({ error: 'Spotify lookup is currently unavailable' })
@@ -538,6 +552,7 @@ router.get('/entities/:type/:entityId', async (req: Request, res: Response) => {
  */
 router.get('/tracks/:trackId', async (req: Request, res: Response) => {
   const userId = getUserId(req)
+  if (userId && (await rejectIfBanned(res, userId))) return
   const accessToken = await getRequestSpotifyAccessToken(userId)
   if (!accessToken) {
     return res.status(503).json({ error: 'Spotify lookup is currently unavailable' })
