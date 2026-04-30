@@ -86,28 +86,30 @@ export default function UserSearchPage() {
             )}
 
             {!loading && users.length > 0 && (
-              <ul className="mt-4 space-y-2">
-                {users.map((user: any) => (
-                <li
-                    key={user.id}
-                    className="rounded-xl border border-border p-4 hover:bg-secondary transition flex justify-between items-center"
-                >
-                    <div>
-                    <div className="text-lg text-primary">
-                        {user.username}
-                    </div>
-                    </div>
+              <div className={`mt-4 ${users.length > 10? 'max-h-[500px] overflow-y-auto' : ''}`}>
+                <ul className="mt-4 space-y-2">
+                  {users.map((user: any) => (
+                  <li
+                      key={user.id}
+                      className="rounded-xl border border-border p-4 hover:bg-secondary transition flex justify-between items-center"
+                  >
+                      <div>
+                      <div className="text-lg text-primary">
+                          {user.username}
+                      </div>
+                      </div>
 
-                    <Button
-                    variant="ghost"
-                    size="2"
-                    onClick={() => navigate(`/user/${user.id}`)}
-                    >
-                    <ArrowRight className="w-5 h-5" />
-                    </Button>
-                </li>
-                ))}
-              </ul>
+                      <Button
+                      variant="ghost"
+                      size="2"
+                      onClick={() => navigate(`/user/${user.id}`)}
+                      >
+                      <ArrowRight className="w-5 h-5" />
+                      </Button>
+                  </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </div>
