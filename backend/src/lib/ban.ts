@@ -56,7 +56,26 @@ export async function banUser(userId: string, options: { endTime?: string; durat
     throw new Error('Ban end time must be in the future')
   }
 
-  return createBan(userId, parsedEndTime.toISOString())
+  const isoEndTime = parsedEndTime.toISOString()
+
+  const activeBan = await getActiveBan(userId)
+
+  if (activeBan) {
+    const { data, error } = await supabase
+      .from('banned_users')
+      .update({ end_time: isoEndTime })
+      .eq('id', activeBan.id)
+      .select('id, created_at, end_time, user_id')
+      .single()
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    return data
+  }
+
+  return createBan(userId, isoEndTime)
 }
 
 export async function unbanUser(userId: string): Promise<void> {
