@@ -98,6 +98,16 @@ router.patch('/:id', async (req, res) => {
     return res.status(400).json({ error: 'No valid fields provided for update' })
   }
 
+  // Fetch the user's CURRENT data
+  const { data: currentUser, error: fetchError } = await supabase
+    .from('users')
+    .select('picture_url')
+    .eq('id', userId)
+    .single()
+
+  if (fetchError) return res.status(500).json({ error: fetchError.message })
+  const oldPictureUrl = currentUser?.picture_url
+
   const { data, error } = await supabase
     .from('users')
     .update(updates)
@@ -106,6 +116,25 @@ router.patch('/:id', async (req, res) => {
     .single()
 
   if (error) return res.status(500).json({ error: error.message })
+
+  if (picture_url !== undefined && oldPictureUrl && oldPictureUrl !== updates.picture_url) {
+    const bucketMarker = '/public/profile_picture/'
+    const urlParts = oldPictureUrl.split(bucketMarker)
+
+    if (urlParts.length === 2) {
+      const oldFilePath = urlParts[1]
+      
+      const { error: deleteError } = await supabase
+        .storage
+        .from('profile_picture')
+        .remove([oldFilePath])
+
+      if (deleteError) {
+        console.error('Failed to clean up old profile picture from storage:', deleteError)
+      }
+    }
+  }
+
   res.json({
     ...data,
     is_admin: await isAdminUser(userId),
