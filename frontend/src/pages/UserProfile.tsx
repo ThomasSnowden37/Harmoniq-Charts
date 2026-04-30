@@ -433,7 +433,7 @@ export default function UserProfile() {
             onClick={() => window.location.href = `/playlists/${listenLaterPlaylistId}`}
           >
           Listen Later
-</Button>
+          </Button>
           {shareBtn}
         </Flex>
       )
@@ -455,6 +455,13 @@ export default function UserProfile() {
     return (
       <Flex direction="column" gap="3">
         <Flex gap="2" wrap="wrap">
+          <Button
+            variant="soft"
+            color="purple"
+            onClick={() => window.location.href = `/playlists/${listenLaterPlaylistId}`}
+          >
+          Listen Later
+          </Button>
           {user && (() => {
             switch (relationship.status) {
               case 'none':

@@ -144,6 +144,7 @@ export default function PlaylistPage() {
   }
 
   const isOwner = playlist?.user_id === user?.id
+  const isListenLater = playlist?.permanent === true
 
   async function handleDrop(fromIndex: number, toIndex: number) {
     if (!playlist || fromIndex === toIndex) return
@@ -254,6 +255,7 @@ export default function PlaylistPage() {
                 </Box>
               )}
             </div>
+            {!isListenLater && (
             <Button
               variant={liked ? 'solid' : 'outline'}
               onClick={() => {
@@ -278,6 +280,7 @@ export default function PlaylistPage() {
               </svg>
               {likesCount}
             </Button>
+            )}
           </Flex>
         </Box>
 
@@ -342,6 +345,7 @@ export default function PlaylistPage() {
         )}
 
         {/* Comments Section */}
+        {!isListenLater && (
         <Box mt="8">
           <Heading size="4" mb="4">Comments</Heading>
           
@@ -411,6 +415,7 @@ export default function PlaylistPage() {
             actionName={loginPromptAction} 
           />
         </Box>
+        )}
       </Box>
       <Footer />
     </Box>
