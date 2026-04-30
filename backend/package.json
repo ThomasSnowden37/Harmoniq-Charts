@@ -13,7 +13,7 @@
     "@spotify/web-api-ts-sdk": "not using for now ^1.2.0 (using a custom fork to get updated playlist endpoints)"
   },
   "dependencies": {
-    "@spotify/web-api-ts-sdk": "github:rarandeyo/spotify-web-api-ts-sdk#feat/update-playlist-endpoints",
+    "@spotify/web-api-ts-sdk": "^1.2.0",
     "@supabase/supabase-js": "^2.39.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

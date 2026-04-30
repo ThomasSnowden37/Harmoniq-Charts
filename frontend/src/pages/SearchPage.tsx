@@ -316,54 +316,56 @@ export default function SearchPage() {
             )}
 
             {!loading && songs.length > 0 && (
-              <ul className="mt-4 space-y-2">
-                {songs.map((song: any) => (
-                  <li
-                    key={song.id}
-                    className="rounded-xl border border-border p-4 hover:bg-secondary transition flex justify-between items-center"
-                  >
-                    <div>
+              <div className={`mt-4 ${songs.length > 10 ? 'max-h-[500px] overflow-y-auto' : ''}`}>
+                <ul className="mt-4 space-y-2">
+                  {songs.map((song: any) => (
+                    <li
+                      key={song.id}
+                      className="rounded-xl border border-border p-4 hover:bg-secondary transition flex justify-between items-center"
+                    >
                       <div>
-                        <div className="text-lg text-primary">
-                          {renderBold(song.title, "title")}
-                        </div>
-                        <div className="text-foreground">
-                          <div className="flex flex-wrap gap-4">
-                              <div className="flex-1 min-w-[150px]">
-                                Artists:{" "}
-                                {song.song_artists?.map((sa: any, index: number) => (
-                                  <span key={index}>
-                                    {renderBold(sa.artists, "artist")}
-                                    {index < song.song_artists.length - 1 && ", "}
-                                  </span>
-                                ))}
-                                </div>
-                              <div className="flex-1 min-w-[200px]">Credits: {renderBold(creditNames(song), "credits")} </div>
-                              <div className="flex-1 min-w-[120px]">Album: {renderBold(song.albums?.name ?? "Single", "album")} </div>
-                          </div>      
+                        <div>
+                          <div className="text-lg text-primary">
+                            {renderBold(song.title, "title")}
+                          </div>
+                          <div className="text-foreground">
+                            <div className="flex flex-wrap gap-4">
+                                <div className="flex-1 min-w-[150px]">
+                                  Artists:{" "}
+                                  {song.song_artists?.map((sa: any, index: number) => (
+                                    <span key={index}>
+                                      {renderBold(sa.artists, "artist")}
+                                      {index < song.song_artists.length - 1 && ", "}
+                                    </span>
+                                  ))}
+                                  </div>
+                                <div className="flex-1 min-w-[200px]">Songwriter(s): {renderBold(song.songwriter, "songwriter")} </div>
+                                <div className="flex-1 min-w-[120px]">Album: {renderBold(song.albums?.name ?? "Single", "album")} </div>
+                            </div>      
 
-                          <div className="flex flex-wrap gap-4 items-center">
-                              <div className="flex-1">Genre: {renderBold(song.genre, "genre")} </div>
-                              <div className="flex-1">Bpm: {renderBold(song.bpm, "bpm")}</div>
-                              <div className="flex-1 min-w-[150px] flex items-center gap-2">
-                                Rating: {renderStars(song.ratings, "rating")}
-                              </div>
+                            <div className="flex flex-wrap gap-4 items-center">
+                                <div className="flex-1">Genre: {renderBold(song.genre, "genre")} </div>
+                                <div className="flex-1">Bpm: {renderBold(song.bpm, "bpm")}</div>
+                                <div className="flex-1 min-w-[150px] flex items-center gap-2">
+                                  Rating: {renderStars(song.ratings, "rating")}
+                                </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Redirect to the page */}
-                    <Button
-                      variant="ghost"
-                      size="2"
-                      onClick={() => navigate(`/songs/${song.id}`)}
-                    >
-                      <ArrowRight className="w-5 h-5" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
+                      {/* Redirect to the page */}
+                      <Button
+                        variant="ghost"
+                        size="2"
+                        onClick={() => navigate(`/songs/${song.id}`)}
+                      >
+                        <ArrowRight className="w-5 h-5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </div>
