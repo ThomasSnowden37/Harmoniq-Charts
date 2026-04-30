@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { isAdminUser } from '../lib/admin.js'
 import { supabase } from '../lib/supabase.js'
 import { generateKey } from 'crypto'
 import * as spotify from '../lib/spotify.js'
@@ -14,7 +15,6 @@ import * as spotify from '../lib/spotify.js'
  */
 
 const router = Router()
-
 
 /**
  * Get all listened to for user
@@ -72,12 +72,37 @@ router.get('/:id', async (req, res) => {
     res.json(data)
 })
 
+router.get('/:id/credits', async (req, res) => {
+    const songId = req.params.id
+    if (!songId) return res.status(400).json({ error: 'song id is required' })
+
+    const { data, error } = await supabase
+        .from('song_credits')
+        .select(`
+            role,
+            artist_id,
+            artists ( id, name )
+        `)
+        .eq('song_id', songId)
+        .order('role', { ascending: true })
+
+    if (error) {
+        return res.status(500).json({ error: 'Failed to load song credits' })
+    }
+
+    res.json(data ?? [])
+})
+
 /**
  * Import a new song
  */
 router.post('/add', async (req, res) => {
 
-    const { userId, title, bpm, genre, year_released, album_name, artist_name, spotify_id } = req.body
+    const { userId, title, bpm, genre, year_released, album_name, artist_name, spotify_id, spotify_import, duration_ms } = req.body
+
+    if (spotify_import) {
+        return res.status(400).json({ error: 'Direct Spotify song importing is disabled. Submit a contribution and link the Spotify track instead.' })
+    }
 
     if (!userId)
         return res.status(400).json({ error: 'Must be logged in to add song' })
@@ -95,24 +120,60 @@ router.post('/add', async (req, res) => {
     }
 
     const genreValue = genre === undefined || genre === null || genre === '' ? null : genre
+    const durationMsValue = duration_ms === undefined || duration_ms === null || duration_ms === '' ? null : Number(duration_ms)
+
+    if (durationMsValue !== null && (Number.isNaN(durationMsValue) || durationMsValue < 0)) {
+        return res.status(400).json({ error: 'Invalid duration' })
+    }
+
+    const artistNames = String(artist_name)
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean)
+
+    if (artistNames.length === 0) {
+        return res.status(400).json({ error: 'At least one artist is required' })
+    }
+
+    const primaryArtistName = artistNames[0]
 
     console.log(userId)
 
-    //check if the artist exists and if not create them
-    let { data: artist } = await supabase
-        .from('artists')
-        .select('id')
-        .eq('name', artist_name)
-        .single()
-    if (!artist) {
-        const { data: Createartist} = await supabase
-            .from('artists')
-            .insert({ name: artist_name })
-            .select()
-            .single()
-        artist = Createartist
+    if (spotify_id) {
+        const { data: existingSpotifySong } = await supabase
+            .from('songs')
+            .select('id')
+            .eq('spotify_id', spotify_id)
+            .limit(1)
+
+        if (existingSpotifySong && existingSpotifySong.length > 0) {
+            return res.status(409).json({ error: 'This Spotify song has already been imported' })
+        }
     }
-    const artist_id = artist?.id
+
+    const artistIds: string[] = []
+    for (const artistNameValue of artistNames) {
+        let { data: artist } = await supabase
+            .from('artists')
+            .select('id')
+            .eq('name', artistNameValue)
+            .single()
+
+        if (!artist) {
+            const { data: createdArtist } = await supabase
+                .from('artists')
+                .insert({ name: artistNameValue })
+                .select()
+                .single()
+            artist = createdArtist
+        }
+
+        if (artist?.id) {
+            artistIds.push(artist.id)
+        }
+    }
+
+    const primaryArtistId = artistIds[0]
 
     //check if the album exists and if not create it
     let album_id: string | null = null
@@ -128,7 +189,7 @@ router.post('/add', async (req, res) => {
             .from('album_artists')
             .select('album_id')
             .in('album_id', albumID)
-            .eq('artist_id', artist_id)
+            .eq('artist_id', primaryArtistId)
             .limit(1)
         if (correctAlbum && correctAlbum.length > 0) {
             album_id = correctAlbum[0].album_id
@@ -149,15 +210,25 @@ router.post('/add', async (req, res) => {
         .from('album_artists')
         .select('*')
         .eq('album_id', album_id)
-        .eq('artist_id', artist_id)
+        .eq('artist_id', primaryArtistId)
         .single()
-    if (!albumArtist) {
+    if (!albumArtist && primaryArtistId) {
         const { data: newAA } = await supabase
         .from('album_artists')
         .insert({
             album_id,
-            artist_id
+            artist_id: primaryArtistId
         })
+    }
+
+    for (const artistId of artistIds.slice(1)) {
+        await supabase
+            .from('album_artists')
+            .insert({
+                album_id,
+                artist_id: artistId,
+            })
+            .select('*')
     }
 
     //Check if song added is a duplicate 
@@ -175,7 +246,7 @@ router.post('/add', async (req, res) => {
             .from('song_artists')
             .select('song_id')
             .in('song_id', songsID)
-            .eq('artist_id', artist_id)
+            .eq('artist_id', primaryArtistId)
             .limit(1)
 
         if (songsSameArtist && songsSameArtist.length > 0 ) {
@@ -188,25 +259,28 @@ router.post('/add', async (req, res) => {
     const { data: song, error} = await supabase
         .from('songs')
         .insert({
-            user_id: userId ?? null,
             title,
             bpm: bpmValue,
             genre: genreValue,
             year_released,
+            duration_ms: durationMsValue,
             album_id,
             spotify_id: spotify_id ?? null,
+            spotify_import: Boolean(spotify_import),
         })
         .select()
         .single()
     const song_id = song.id 
     if (error) return res.status(500).json({ error: error.message })
 
-    const { data: newSongArtist } = await supabase
-        .from('song_artists')
-        .insert({
-            song_id,
-            artist_id
-        })
+    for (const artistId of artistIds) {
+        await supabase
+            .from('song_artists')
+            .insert({
+                song_id,
+                artist_id: artistId,
+            })
+    }
     res.status(201).json(song)
 })
 
@@ -226,18 +300,20 @@ router.delete('/:id', async (req, res) => {
         return res.status(400).json({ error: 'Song ID is required' })
     }
     try {
-        //check if the song exists and belongs to the user
+        const isAdmin = await isAdminUser(userId)
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Admin access required' })
+        }
+
         const { data: existSong, error: noSong } = await supabase 
             .from('songs')
-            .select('id, user_id')
+            .select('id')
             .eq('id',songId )
             .single()
         if (noSong) {
             return res.status(404).json({ error: 'Song is not found' })
         }
-        if (existSong.user_id != userId) {
-            return res.status(404).json({ error: 'You can only delete your own songs' })
-        }
+
         //delete the song
         const { error : deleteError } = await supabase
             .from('songs')
@@ -275,18 +351,18 @@ router.patch('/:id', async (req, res) => {
         return res.status(400).json({ error: 'Invalid Year' })
     }
     try {
-        //check if the song exists and belongs to the user
+        const isAdmin = await isAdminUser(userId)
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Admin access required' })
+        }
+
         const { data: existSong, error: noSong } = await supabase 
             .from('songs')
-            .select('id, user_id')
+            .select('id')
             .eq('id',songId )
             .single()
         if (noSong) {
             return res.status(404).json({ error: 'Song is not found' })
-        }
-
-        if (existSong.user_id != userId) {
-            return res.status(403).json({ error: 'You can only edit your own songs' })
         }
 
         // Build update object; only set spotify_id when provided in request
@@ -452,6 +528,35 @@ router.get('/:id/listened/count', async (req, res) => {
 })
 
 /**
+ * Function to get/create the users Listen Later Playlist
+ */
+async function ListenLaterHelper(userId: string) {
+    const { data: existing, error: eerror} = await supabase
+        .from('playlists')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('name', 'Listen Later')
+        .eq('permanent', true)
+        .maybeSingle()
+
+    if (eerror) throw eerror
+    if (existing) return existing.id
+
+    const { data: create, error: cerror} = await supabase
+        .from('playlists')
+        .insert({
+            user_id: userId,
+            name: 'Listen Later',
+            permanent: true,
+        })
+        .select('id')
+        .single()
+
+    if (cerror) throw cerror
+    if (create) return create.id
+}
+
+/**
  * Get aggregated engagement details for a song
  * Returns: { listenedCount, likeCount, average, count }
  */
@@ -509,6 +614,8 @@ router.get('/:id/status', async (req, res) => {
         return res.json({ listened: false, listento: false, liked: false, rating: null })
     }
 
+    const playLL = await ListenLaterHelper(userId)
+
     try {
         const [
             { data: listenedData },
@@ -517,7 +624,7 @@ router.get('/:id/status', async (req, res) => {
             { data: ratingData }
         ] = await Promise.all([
             supabase.from('listened').select('id').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
-            supabase.from('listento').select('id').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
+            supabase.from('playlist_songs').select('id').eq('song_id', songId).eq('playlist_id', playLL).maybeSingle(),
             supabase.from('likes').select('id').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
             supabase.from('ratings').select('rating').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
         ])
@@ -552,18 +659,24 @@ router.get('/:id/listento', async (req, res) => {
         return res.status(404).json({ error: 'Song is not found' })
     }
 
-    const { data, error } = await supabase
-        .from('listento')
-        .select('id')
-        .eq('song_id', songId)
-        .eq('user_id', userId)
-        .single()
-    const listento = !!data
-    res.json({ listento })
+    try {
+        const playLL = await ListenLaterHelper(userId)
+
+        const { data } = await supabase
+            .from('playlist_songs')
+            .select('id')
+            .eq('playlist_id', playLL)
+            .eq('song_id', songId)
+            .maybeSingle()
+
+        res.json({ listento: !!data })
+    } catch (err: any) {
+        res.status(500).json({ error: err.message })
+    }
 })
 
 /**
- * Add a song to a users listen to
+ * Add a song to a users listen later
  */
 router.post('/:id/listento', async (req, res) => {
      const songId = req.params.id;
@@ -578,33 +691,37 @@ router.post('/:id/listento', async (req, res) => {
         .select('id')
         .eq('id', songId)
         .single()
+
     if (noSong) {
         return res.status(404).json({ error: 'Song is not found' })
     }
 
-    const { data: existing, error: errorExisting } = await supabase
-        .from('listento')
-        .select('id')
-        .eq('song_id', songId)
-        .eq('user_id', userId)
-        .single()
+    const userLL = await ListenLaterHelper(userId)
 
-    if (existing) {
-        return res.status(409).json({ error: 'Already listened' })
+    const { data: LLPlay} = await supabase
+        .from('playlist_songs')
+        .select('id')
+        .eq('playlist_id', userLL)
+        .eq('song_id', songId)
+        .maybeSingle()
+
+    if (LLPlay) {
+        return res.status(409).json({ error: 'Song already in Listen Later' })
     }
 
-    const {data, error} = await supabase
-        .from('listento')
+    const { data, error } = await supabase
+        .from('playlist_songs')
         .insert({
-            user_id: userId,
-            song_id: songId 
+            playlist_id: userLL,
+            song_id: songId
         })
         .select()
         .single()
 
-    if (error){
-        return res.status(500).json({ error: 'Failed to add song to listento'})
+    if (error) {
+        return res.status(409).json({ error: 'Failed to add to Listen Later' })
     }
+    
     return res.status(201).json(data)
 })
 
@@ -619,24 +736,18 @@ router.delete('/:id/listento', async (req, res) => {
         return res.status(400).json({ error: 'Song ID is required' })
     }
 
-    const { data: existSong, error: noSong } = await supabase 
-        .from('songs')
-        .select('id')
-        .eq('id', songId)
-        .single()
-    if (noSong) {
-        return res.status(404).json({ error: 'Song is not found' })
-    }
+    const userLL = await ListenLaterHelper(userId)
 
-    const { error } = await supabase
-        .from('listento')
+    const { error} = await supabase
+        .from('playlist_songs')
         .delete()
+        .eq('playlist_id', userLL)
         .eq('song_id', songId)
-        .eq('user_id', userId)
 
     if (error) {
-        return res.status(500).json({ error: 'Failed to remove listen to' })
+        return res.status(500).json({ error: 'Failed to delete from Listen Later' })
     }
+    
     res.json({ message: 'Successfully deleted' })
 })
 
@@ -663,23 +774,44 @@ router.post('/album/:albumId/bulk-add', async (req, res) => {
         if (!songs || songs.length === 0) {
             return res.status(404).json({ error: 'No songs found for this album' });
         }
+        if (targetTable === 'listened') {
+            const insertData = songs.map(song => ({
+                user_id: userId,
+                song_id: song.id
+            }));
 
-        const insertData = songs.map(song => ({
-            user_id: userId,
-            song_id: song.id
-        }));
+            const { data, error: insertError } = await supabase
+                .from(targetTable)
+                .upsert(insertData, { onConflict: 'user_id, song_id' })
+                .select();
 
-        const { data, error: insertError } = await supabase
-            .from(targetTable)
-            .upsert(insertData, { onConflict: 'user_id, song_id' })
-            .select();
+            if (insertError) throw insertError;
 
-        if (insertError) throw insertError;
+            return res.status(201).json({ 
+                message: `Successfully processed ${insertData.length} songs`,
+                count: data?.length 
+            });
+        }
+        if (targetTable === 'listento') {
+            const userLL = await ListenLaterHelper(userId)
 
-        return res.status(201).json({ 
-            message: `Successfully processed ${insertData.length} songs`,
-            count: data?.length 
-        });
+            const insertData = songs.map(song => ({
+                playlist_id: userLL,
+                song_id: song.id
+            }));
+
+            const { data, error: insertError } = await supabase
+                .from('playlist_songs')
+                .upsert(insertData, { onConflict: 'playlist_id,song_id' })
+                .select();
+            
+            if (insertError) throw insertError;
+
+            return res.status(201).json({ 
+                message: `Successfully added ${insertData.length} songs to Listen Later`,
+                count: data?.length 
+            });
+        }
     } catch (err: any) {
         console.error("Bulk Add Error:", err);
         return res.status(500).json({ error: err.message });

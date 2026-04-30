@@ -4,8 +4,32 @@ CREATE TABLE users (
     username VARCHAR(50) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    privacy VARCHAR(10) NOT NULL DEFAULT 'public' CHECK (privacy IN ('public', 'private'))
+    privacy VARCHAR(10) NOT NULL DEFAULT 'public' CHECK (privacy IN ('public', 'private')),
+    reputation NUMERIC NOT NULL DEFAULT 0
 );
+
+CREATE TABLE user_privileges (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    privilege_level SMALLINT NOT NULL CHECK (privilege_level IN (1, 2)),
+    granted_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_privileges_level ON user_privileges(privilege_level, user_id);
+
+CREATE TABLE banned_users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX idx_banned_users_user_end_time ON banned_users(user_id, end_time);
+
+ALTER TABLE banned_users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations on banned_users" ON banned_users FOR ALL USING (true) WITH CHECK (true);
 
 -- Artists table
 CREATE TABLE artists (
@@ -32,9 +56,8 @@ CREATE TABLE songs (
     year_released INTEGER,
     album_id UUID REFERENCES albums(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE SET NULL,
-    spotify_id VARCHAR(50)
-    trending_score NUMERIC DEFAULT 0,
+    spotify_id VARCHAR(50),
+    trending_score NUMERIC DEFAULT 0
 );
 
 -- MANY TO MANY TABLES
@@ -42,6 +65,15 @@ CREATE TABLE song_artists (
     song_id UUID REFERENCES songs(id) ON DELETE CASCADE,
     artist_id UUID REFERENCES artists(id) ON DELETE CASCADE,
     PRIMARY KEY (song_id, artist_id)
+);
+
+CREATE TABLE song_credits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    song_id UUID REFERENCES songs(id) ON DELETE CASCADE NOT NULL,
+    artist_id UUID REFERENCES artists(id) ON DELETE CASCADE NOT NULL,
+    role TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(song_id, artist_id, role)
 );
 
 CREATE TABLE album_artists (
@@ -58,6 +90,7 @@ CREATE TABLE reviews (
     song_id UUID REFERENCES songs(id) ON DELETE CASCADE NOT NULL,
     content TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    trending_score NUMERIC DEFAULT 0,
     UNIQUE(user_id, song_id) -- One review per user per song
 );
 
@@ -104,6 +137,8 @@ CREATE TABLE playlists (
     is_pinned BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     spotify_playlist_id VARCHAR(50)
+    trending_score NUMERIC DEFAULT 0,
+    permanent BOOLEAN DEFAULT FALSE,
 );
 
 CREATE TABLE playlist_songs (
@@ -191,6 +226,8 @@ CREATE INDEX idx_playlist_likes_playlist_id ON playlist_likes(playlist_id);
 CREATE INDEX idx_playlist_likes_user_id ON playlist_likes(user_id);
 CREATE INDEX idx_playlist_comments_playlist_id ON playlist_comments(playlist_id);
 CREATE INDEX idx_songs_album_id ON songs(album_id);
+CREATE INDEX idx_song_credits_song_id ON song_credits(song_id);
+CREATE INDEX idx_song_credits_artist_id ON song_credits(artist_id);
 CREATE INDEX idx_recommendations_source ON recommendations(source_song_id);
 CREATE INDEX idx_friend_requests_requester ON friend_requests(requester_id);
 CREATE INDEX idx_friend_requests_addressee ON friend_requests(addressee_id);
@@ -212,6 +249,7 @@ ALTER TABLE songs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE artists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE albums ENABLE ROW LEVEL SECURITY;
 ALTER TABLE song_artists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE song_credits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE album_artists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recommendations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE friend_requests ENABLE ROW LEVEL SECURITY;
@@ -222,6 +260,7 @@ CREATE POLICY "Public read access" ON songs FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON artists FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON albums FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON song_artists FOR SELECT USING (true);
+CREATE POLICY "Public read access" ON song_credits FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON album_artists FOR SELECT USING (true);
 
 -- Policies for user-specific content

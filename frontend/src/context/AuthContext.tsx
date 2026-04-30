@@ -11,6 +11,7 @@ interface GoogleUser {
   name: string;
   email: string;
   picture: string;
+  isAdmin?: boolean;
 }
 
 interface AuthContextType {
@@ -25,7 +26,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<GoogleUser | null>(() => {
     const stored = localStorage.getItem('harmoniq_user');
-    return stored ? JSON.parse(stored) : null;
+    if (!stored) return null;
+
+    const parsed = JSON.parse(stored);
+    return {
+      ...parsed,
+      isAdmin: parsed.isAdmin ?? parsed.is_admin ?? false,
+    };
   });
 
   useEffect(() => {
@@ -58,8 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             body: JSON.stringify({
                 id: decoded.sub,
                 email: decoded.email,
-                username: decoded.name
-            })
+              username: decoded.name,
+              picture_url: decoded.picture,
+          })
         });
 
         if (res.ok) {
@@ -68,13 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           const finalUser: GoogleUser = {
             ...googleUser,
-            name: dbUser.username
+            name: dbUser.username,
+            isAdmin: Boolean(dbUser.is_admin),
+            picture: dbUser.picture_url ?? googleUser.picture,
           };
 
           setUser(finalUser);
-          setRealUserId(finalUser.id); 
-
-          window.location.href = '/feed';
         }
       } catch (err) {
         console.error("Backend sync failed", err);

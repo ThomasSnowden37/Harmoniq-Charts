@@ -69,7 +69,6 @@ export interface Database {
           year_released: number | null
           album_id: string | null
           created_at: string
-          user_id: string | null
           spotify_id: string | null
           trending_score: number | null
         }
@@ -81,7 +80,6 @@ export interface Database {
           year_released?: number | null
           album_id?: string | null
           created_at?: string
-          user_id: string | null
           spotify_id?: string | null
           trending_score: number | null
         }
@@ -93,7 +91,6 @@ export interface Database {
           year_released?: number | null
           album_id?: string | null
           created_at?: string
-          user_id: string | null
           spotify_id?: string | null
           trending_score: number | null
         }
@@ -110,6 +107,29 @@ export interface Database {
         Update: {
           song_id?: string
           artist_id?: string
+        }
+      }
+      song_credits: {
+        Row: {
+          id: string
+          song_id: string
+          artist_id: string
+          role: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          song_id: string
+          artist_id: string
+          role: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          song_id?: string
+          artist_id?: string
+          role?: string
+          created_at?: string
         }
       }
       album_artists: {
@@ -133,6 +153,7 @@ export interface Database {
           song_id: string
           content: string
           created_at: string
+          trending_score: number | null
         }
         Insert: {
           id?: string
@@ -140,6 +161,7 @@ export interface Database {
           song_id: string
           content: string
           created_at?: string
+          trending_score: number | null
         }
         Update: {
           id?: string
@@ -147,6 +169,7 @@ export interface Database {
           song_id?: string
           content?: string
           created_at?: string
+          trending_score: number | null
         }
       }
       likes: {
@@ -246,6 +269,8 @@ export interface Database {
           is_pinned: boolean
           created_at: string
           spotify_playlist_id: string | null
+          trending_score: number | null
+          permanent: boolean
         }
         Insert: {
           id?: string
@@ -254,6 +279,8 @@ export interface Database {
           is_pinned?: boolean
           created_at?: string
           spotify_playlist_id?: string | null
+          trending_score: number | null
+          permanent: boolean
         }
         Update: {
           id?: string
@@ -262,6 +289,8 @@ export interface Database {
           is_pinned?: boolean
           created_at?: string
           spotify_playlist_id?: string | null
+          trending_score: number | null
+          permanent: boolean
         }
       }
       playlist_songs: {
@@ -366,29 +395,29 @@ export interface Database {
           spotify_profile_url?: string | null
           created_at?: string
           updated_at?: string
-          favorite_songs: {
-            Row: {
-              id: string
-              user_id: string
-              song_id: string
-              position: number
-              created_at: string
-            }
-            Insert: {
-              id?: string
-              user_id: string
-              song_id: string
-              position: number
-              created_at?: string
-            }
-            Update: {
-              id?: string
-              user_id?: string
-              song_id?: string
-              position?: number
-              created_at?: string
-            }
-          }
+        }
+      }
+      favorite_songs: {
+        Row: {
+          id: string
+          user_id: string
+          song_id: string
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          song_id: string
+          position: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          song_id?: string
+          position?: number
+          created_at?: string
         }
       }
     }

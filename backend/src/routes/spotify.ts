@@ -8,14 +8,176 @@
 import { Router, Request, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import * as spotify from '../lib/spotify.js'
+import { detectDuplicateCandidates, proposalHighConfidenceMatchThreshold } from '../lib/proposals.js'
 import { determineTrackTempo, fetchReccoBeatsTempo } from '../lib/tempo.js'
 import { fetchAllPlaylistTracks, normalizePlaylistItems } from '../lib/playlist.js'
+import { rejectIfBanned } from '../lib/ban.js'
 import crypto from 'crypto'
 
 const router = Router()
 
+function sendSpotifyRouteError(res: Response, err: unknown) {
+  const context = spotify.getSpotifyErrorContext(err)
+  if (context.statusCode === 429) {
+    if (context.retryAfterSeconds !== null) {
+      res.setHeader('Retry-After', String(context.retryAfterSeconds))
+    }
+
+    return res.status(429).json({ error: err instanceof Error ? err.message : 'Spotify rate limit exceeded' })
+  }
+
+  const statusCode = context.statusCode && context.statusCode >= 400 ? context.statusCode : 500
+  return res.status(statusCode).json({ error: err instanceof Error ? err.message : 'Spotify request failed' })
+}
+
 function getUserId(req: Request): string | null {
   return req.headers['x-user-id'] as string || null
+}
+
+type SpotifyEntityType = 'track' | 'artist' | 'album'
+
+function parseSpotifyEntityId(input: string, entityType: SpotifyEntityType): string | null {
+  const value = input.trim()
+  if (!value) return null
+
+  const uriMatch = value.match(/^spotify:(track|artist|album):([a-zA-Z0-9]+)$/)
+  if (uriMatch) return uriMatch[1].toLowerCase() === entityType ? uriMatch[2] : null
+
+  try {
+    const url = new URL(value)
+    if (!url.hostname.includes('spotify.com')) return null
+    const pathMatch = url.pathname.match(/\/(track|artist|album)\/([a-zA-Z0-9]+)/)
+    if (!pathMatch) return null
+    return pathMatch[1].toLowerCase() === entityType ? pathMatch[2] : null
+  } catch {
+    return /^[a-zA-Z0-9]+$/.test(value) ? value : null
+  }
+}
+
+function normalizeSpotifyEntityItem(item: any, entityType: SpotifyEntityType) {
+  if (!item?.id) return null
+
+  if (entityType === 'track') {
+    const artistNames = Array.isArray(item.artists)
+      ? item.artists.map((artist: any) => String(artist?.name ?? '')).filter(Boolean)
+      : []
+
+    return {
+      id: String(item.id),
+      type: entityType,
+      name: String(item.name ?? 'Unknown track'),
+      subtitle: [artistNames.join(', '), item?.album?.name ? String(item.album.name) : null].filter(Boolean).join(' • '),
+      image_url: item?.album?.images?.[0]?.url ?? item?.album?.images?.[1]?.url ?? null,
+      spotify_url: typeof item?.external_urls?.spotify === 'string' ? item.external_urls.spotify : null,
+    }
+  }
+
+  if (entityType === 'artist') {
+    const genres = Array.isArray(item.genres)
+      ? item.genres.map((genre: any) => String(genre)).filter(Boolean).slice(0, 2)
+      : []
+
+    return {
+      id: String(item.id),
+      type: entityType,
+      name: String(item.name ?? 'Unknown artist'),
+      subtitle: genres.length > 0 ? genres.join(' • ') : 'Artist',
+      image_url: item?.images?.[0]?.url ?? item?.images?.[1]?.url ?? null,
+      spotify_url: typeof item?.external_urls?.spotify === 'string' ? item.external_urls.spotify : null,
+    }
+  }
+
+  const albumArtistNames = Array.isArray(item.artists)
+    ? item.artists.map((artist: any) => String(artist?.name ?? '')).filter(Boolean)
+    : []
+  const releaseYear = typeof item?.release_date === 'string'
+    ? String(item.release_date).split('-')[0] ?? null
+    : null
+
+  return {
+    id: String(item.id),
+    type: entityType,
+    name: String(item.name ?? 'Unknown album'),
+    subtitle: [albumArtistNames.join(', '), releaseYear].filter(Boolean).join(' • '),
+    image_url: item?.images?.[0]?.url ?? item?.images?.[1]?.url ?? null,
+    spotify_url: typeof item?.external_urls?.spotify === 'string' ? item.external_urls.spotify : null,
+  }
+}
+
+async function getSpotifyEntity(entityType: SpotifyEntityType, entityId: string, accessToken: string) {
+  switch (entityType) {
+    case 'artist':
+      return spotify.getArtist(entityId, accessToken)
+    case 'album':
+      return spotify.getAlbum(entityId, accessToken)
+    default:
+      return spotify.getTrack(entityId, accessToken)
+  }
+}
+
+async function searchSpotifyEntities(entityType: SpotifyEntityType, query: string, accessToken: string, limit: number) {
+  switch (entityType) {
+    case 'artist': {
+      const result = await spotify.searchArtists(query, accessToken, limit)
+      return {
+        items: result.artists?.items ?? [],
+        total: result.artists?.total ?? 0,
+      }
+    }
+    case 'album': {
+      const result = await spotify.searchAlbums(query, accessToken, limit)
+      return {
+        items: result.albums?.items ?? [],
+        total: result.albums?.total ?? 0,
+      }
+    }
+    default: {
+      const result = await spotify.searchTracks(query, accessToken, limit)
+      return {
+        items: result.tracks?.items ?? [],
+        total: result.tracks?.total ?? 0,
+      }
+    }
+  }
+}
+
+function trackReleaseYear(track: any): number | null {
+  const releaseDate = track?.album?.release_date
+  if (!releaseDate) return null
+  const year = Number.parseInt(String(releaseDate).split('-')[0] ?? '', 10)
+  return Number.isFinite(year) ? year : null
+}
+
+function basePlaylistPreviewItem(track: any, bpm: number | null, position: number) {
+  return {
+    trackId: String(track.id),
+    title: String(track?.name ?? 'Unknown track'),
+    artists: Array.isArray(track?.artists) ? track.artists.map((artist: any) => String(artist?.name ?? '')).filter(Boolean) : [],
+    album: typeof track?.album?.name === 'string' ? track.album.name : null,
+    year_released: trackReleaseYear(track),
+    bpm,
+    position,
+    matchState: 'no_match' as const,
+    songId: null,
+    matchedTitle: null,
+    candidates: [],
+  }
+}
+
+async function getRequestSpotifyAccessToken(userId: string | null): Promise<string | null> {
+  if (userId) {
+    const userToken = await getValidAccessToken(userId)
+    if (userToken) {
+      return userToken
+    }
+  }
+
+  try {
+    return await spotify.getAppAccessToken()
+  } catch (err: any) {
+    console.error('Failed to get app Spotify token:', err)
+    return null
+  }
 }
 
 /**
@@ -69,11 +231,13 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
  * GET /auth/url
  * Generate Spotify OAuth authorization URL
  */
-router.get('/auth/url', (req: Request, res: Response) => {
+router.get('/auth/url', async (req: Request, res: Response) => {
   const userId = getUserId(req)
   if (!userId) {
     return res.status(401).json({ error: 'Authentication required' })
   }
+
+  if (await rejectIfBanned(res, userId)) return
 
   // Use userId as state to verify callback (URL-safe base64)
   const state = Buffer.from(JSON.stringify({ userId, ts: Date.now() }))
@@ -118,6 +282,8 @@ router.get('/auth/callback', async (req: Request, res: Response) => {
     if (!userId) {
       throw new Error('Invalid state: missing userId')
     }
+
+    if (await rejectIfBanned(res, userId)) return
 
     // Exchange code for tokens
     const tokens = await spotify.exchangeCode(code as string)
@@ -164,6 +330,8 @@ router.get('/connection-status', async (req: Request, res: Response) => {
   if (!userId) {
     return res.status(401).json({ error: 'Authentication required' })
   }
+
+  if (await rejectIfBanned(res, userId)) return
 
   const { data, error } = await supabase
     .from('user_spotify_tokens')
@@ -219,6 +387,8 @@ router.get('/playlists', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Authentication required' })
   }
 
+  if (await rejectIfBanned(res, userId)) return
+
   const accessToken = await getValidAccessToken(userId)
   if (!accessToken) {
     return res.status(401).json({ error: 'Spotify not connected or token expired' })
@@ -231,7 +401,7 @@ router.get('/playlists', async (req: Request, res: Response) => {
     const result = await spotify.getUserPlaylists(accessToken, limit, offset)
     res.json(result)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    sendSpotifyRouteError(res, err)
   }
 })
 
@@ -244,6 +414,8 @@ router.get('/playlists/:playlistId/tracks', async (req: Request, res: Response) 
   if (!userId) {
     return res.status(401).json({ error: 'Authentication required' })
   }
+
+  if (await rejectIfBanned(res, userId)) return
 
   const accessToken = await getValidAccessToken(userId)
   if (!accessToken) {
@@ -258,7 +430,7 @@ router.get('/playlists/:playlistId/tracks', async (req: Request, res: Response) 
     const result = await spotify.getPlaylistTracks(playlistId, accessToken, limit, offset)
     res.json(result)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    sendSpotifyRouteError(res, err)
   }
 })
 
@@ -268,13 +440,10 @@ router.get('/playlists/:playlistId/tracks', async (req: Request, res: Response) 
  */
 router.get('/search', async (req: Request, res: Response) => {
   const userId = getUserId(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' })
-  }
-
-  const accessToken = await getValidAccessToken(userId)
+  if (userId && (await rejectIfBanned(res, userId))) return
+  const accessToken = await getRequestSpotifyAccessToken(userId)
   if (!accessToken) {
-    return res.status(401).json({ error: 'Spotify not connected or token expired' })
+    return res.status(503).json({ error: 'Spotify lookup is currently unavailable' })
   }
 
   try {
@@ -284,10 +453,96 @@ router.get('/search', async (req: Request, res: Response) => {
     }
 
     const limit = parseInt(req.query.limit as string) || 20
+
+    const trackId = parseSpotifyEntityId(query, 'track')
+    if (trackId) {
+      const track = await spotify.getTrack(trackId, accessToken)
+      return res.json({
+        tracks: {
+          items: track ? [track] : [],
+          total: track ? 1 : 0,
+        },
+      })
+    }
+
     const result = await spotify.searchTracks(query, accessToken, limit)
     res.json(result)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    sendSpotifyRouteError(res, err)
+  }
+})
+
+router.get('/search/entities', async (req: Request, res: Response) => {
+  const userId = getUserId(req)
+  if (userId && (await rejectIfBanned(res, userId))) return
+  const accessToken = await getRequestSpotifyAccessToken(userId)
+  if (!accessToken) {
+    return res.status(503).json({ error: 'Spotify lookup is currently unavailable' })
+  }
+
+  try {
+    const query = req.query.q as string
+    const entityType = req.query.type as SpotifyEntityType
+    if (!query) {
+      return res.status(400).json({ error: 'Query parameter "q" is required' })
+    }
+
+    if (entityType !== 'track' && entityType !== 'artist' && entityType !== 'album') {
+      return res.status(400).json({ error: 'Query parameter "type" must be one of: track, artist, album' })
+    }
+
+    const requestedLimit = Number.parseInt(req.query.limit as string, 10)
+    const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(6, requestedLimit)) : 6
+    const directEntityId = parseSpotifyEntityId(query, entityType)
+
+    if (directEntityId) {
+      const entity = await getSpotifyEntity(entityType, directEntityId, accessToken)
+      const item = normalizeSpotifyEntityItem(entity, entityType)
+      return res.json({
+        type: entityType,
+        total: item ? 1 : 0,
+        items: item ? [item] : [],
+      })
+    }
+
+    const result = await searchSpotifyEntities(entityType, query, accessToken, limit)
+    return res.json({
+      type: entityType,
+      total: result.total,
+      items: result.items
+        .map((item) => normalizeSpotifyEntityItem(item, entityType))
+        .filter(Boolean),
+    })
+  } catch (err: any) {
+    sendSpotifyRouteError(res, err)
+  }
+})
+
+router.get('/entities/:type/:entityId', async (req: Request, res: Response) => {
+  const userId = getUserId(req)
+  if (userId && (await rejectIfBanned(res, userId))) return
+  const accessToken = await getRequestSpotifyAccessToken(userId)
+  if (!accessToken) {
+    return res.status(503).json({ error: 'Spotify lookup is currently unavailable' })
+  }
+
+  try {
+    const entityType = req.params.type as SpotifyEntityType
+    const { entityId } = req.params
+
+    if (entityType !== 'track' && entityType !== 'artist' && entityType !== 'album') {
+      return res.status(400).json({ error: 'Route parameter "type" must be one of: track, artist, album' })
+    }
+
+    const entity = await getSpotifyEntity(entityType, entityId, accessToken)
+    const item = normalizeSpotifyEntityItem(entity, entityType)
+    if (!item) {
+      return res.status(404).json({ error: 'Spotify entity not found' })
+    }
+
+    return res.json(item)
+  } catch (err: any) {
+    sendSpotifyRouteError(res, err)
   }
 })
 
@@ -297,13 +552,10 @@ router.get('/search', async (req: Request, res: Response) => {
  */
 router.get('/tracks/:trackId', async (req: Request, res: Response) => {
   const userId = getUserId(req)
-  if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' })
-  }
-
-  const accessToken = await getValidAccessToken(userId)
+  if (userId && (await rejectIfBanned(res, userId))) return
+  const accessToken = await getRequestSpotifyAccessToken(userId)
   if (!accessToken) {
-    return res.status(401).json({ error: 'Spotify not connected or token expired' })
+    return res.status(503).json({ error: 'Spotify lookup is currently unavailable' })
   }
 
   try {
@@ -321,14 +573,9 @@ router.get('/tracks/:trackId', async (req: Request, res: Response) => {
         const genreSet = new Set<string>()
         for (const artistId of artistIds) {
           try {
-            const artistRes = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
-              headers: { Authorization: `Bearer ${accessToken}` },
-            })
-            if (artistRes.ok) {
-              const artistData: any = await artistRes.json()
-              if (Array.isArray(artistData.genres)) {
-                for (const g of artistData.genres) genreSet.add(g)
-              }
+            const artistData: any = await spotify.getArtist(artistId, accessToken)
+            if (Array.isArray(artistData.genres)) {
+              for (const g of artistData.genres) genreSet.add(g)
             }
           } catch (e) {
             // ignore individual artist fetch errors
@@ -373,7 +620,7 @@ router.get('/tracks/:trackId', async (req: Request, res: Response) => {
       primaryGenre: genres.length > 0 ? genres[0] : null,
     })
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    sendSpotifyRouteError(res, err)
   }
 })
 
@@ -424,9 +671,11 @@ router.post('/import-playlist/preview-stream', async (req: Request, res: Respons
     let aborted = false
     req.on('close', () => { aborted = true })
 
-    const foundResults: Array<{ title: string; songId?: string }> = []
-    const toImportResults: Array<any> = []
+    const linkedResults: any[] = []
+    const matchResults: any[] = []
+    const unmatchedResults: any[] = []
     const skippedResults: Array<{ title: string; reason?: string }> = []
+    const previewItems: any[] = []
 
     // Send init message
     res.write(JSON.stringify({ type: 'init', total, playlist: { id: spotifyPlaylistId, name: playlistName || 'Imported from Spotify' } }) + '\n')
@@ -456,21 +705,41 @@ router.post('/import-playlist/preview-stream', async (req: Request, res: Respons
         }
 
         if (existingSong) {
-          foundResults.push({ title: existingSong.title ?? trackName, songId: existingSong.id })
-          res.write(JSON.stringify({ type: 'item', index: i, total, item: { title: existingSong.title ?? trackName, songId: existingSong.id, found: true } }) + '\n')
-        } else {
-          const importDetail = {
-            title: trackName,
-            spotify_id: track.id,
-            artists: (track.artists || []).map((a: any) => a.name),
-            album: track.album?.name ?? null,
-            year_released: track.album?.release_date ? parseInt(track.album.release_date.split('-')[0]) : null,
-            bpm,
-            songId: null,
-            found: false,
+          const previewItem = {
+            ...basePlaylistPreviewItem(track, bpm, i),
+            matchState: 'linked' as const,
+            songId: String(existingSong.id),
+            matchedTitle: String(existingSong.title ?? trackName),
           }
-          toImportResults.push(importDetail)
-          res.write(JSON.stringify({ type: 'item', index: i, total, item: importDetail }) + '\n')
+
+          linkedResults.push(previewItem)
+          previewItems.push(previewItem)
+          res.write(JSON.stringify({ type: 'item', index: i, total, item: previewItem }) + '\n')
+        } else {
+          const candidates = await detectDuplicateCandidates({
+            title: trackName,
+            artist_name: Array.isArray(track.artists) ? track.artists.map((artist: any) => artist.name).join(', ') : '',
+            album_name: track.album?.name ?? undefined,
+            year_released: trackReleaseYear(track) ?? undefined,
+          })
+          const confidentCandidates = candidates
+            .filter((candidate) => candidate.confidence >= proposalHighConfidenceMatchThreshold())
+            .slice(0, 3)
+
+          const previewItem = {
+            ...basePlaylistPreviewItem(track, bpm, i),
+            matchState: confidentCandidates.length > 0 ? 'match_available' as const : 'no_match' as const,
+            candidates: confidentCandidates,
+          }
+
+          if (confidentCandidates.length > 0) {
+            matchResults.push(previewItem)
+          } else {
+            unmatchedResults.push(previewItem)
+          }
+
+          previewItems.push(previewItem)
+          res.write(JSON.stringify({ type: 'item', index: i, total, item: previewItem }) + '\n')
         }
       } catch (err: any) {
         skippedResults.push({ title: trackName, reason: String((err as any)?.message || err) })
@@ -486,9 +755,13 @@ router.post('/import-playlist/preview-stream', async (req: Request, res: Respons
     // Final summary
     res.write(JSON.stringify({
       type: 'complete',
-      counts: { found: foundResults.length, imported: toImportResults.length, skipped: skippedResults.length },
-      found: foundResults,
-      imported: toImportResults,
+      counts: {
+        linked: linkedResults.length,
+        matchAvailable: matchResults.length,
+        noMatch: unmatchedResults.length,
+        skipped: skippedResults.length,
+      },
+      items: previewItems,
       skipped: skippedResults,
       playlist: { id: spotifyPlaylistId, name: playlistName || 'Imported from Spotify' },
     }) + '\n')
@@ -508,7 +781,7 @@ router.post('/import-playlist/preview-stream', async (req: Request, res: Respons
 
 /**
  * POST /import-playlist
- * Import a Spotify playlist into Harmoniq
+ * Import a Spotify playlist into Harmoniq using confirmed existing-song matches only.
  */
 router.post('/import-playlist', async (req: Request, res: Response) => {
   const userId = getUserId(req)
@@ -516,386 +789,74 @@ router.post('/import-playlist', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Authentication required' })
   }
 
-  const accessToken = await getValidAccessToken(userId)
-  if (!accessToken) {
-    return res.status(401).json({ error: 'Spotify not connected or token expired' })
-  }
-
   const { spotifyPlaylistId, playlistName } = req.body
   if (!spotifyPlaylistId) {
     return res.status(400).json({ error: 'spotifyPlaylistId is required' })
   }
 
+
+  const selectedMatches = Array.isArray(req.body?.selectedMatches) ? req.body.selectedMatches : []
+  const unmatchedItems = Array.isArray(req.body?.unmatchedItems) ? req.body.unmatchedItems : []
+  const skippedItems = Array.isArray(req.body?.skippedItems) ? req.body.skippedItems : []
+
   try {
-    // Get all tracks from Spotify playlist (paginated)
+    const { data: created, error: playlistError } = await supabase
+      .from('playlists')
+      .insert({
+        user_id: userId,
+        name: playlistName || 'Imported from Spotify',
+        spotify_playlist_id: spotifyPlaylistId,
+      })
+      .select()
+      .single()
 
-    let allTracks: any[] = []
-    try {
-      allTracks = await fetchAllPlaylistTracks(spotifyPlaylistId, accessToken, 100)
-    } catch (err: any) {
-      const msg = err?.message || String(err)
-      if (msg.includes('Forbidden') || msg.includes('Bad OAuth') || msg.includes('401') || msg.includes('403')) {
-        return res.status(502).json({
-          error: 'Spotify API returned a Forbidden/OAuth error while fetching playlist tracks. Check that your SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET match the app used to authorize users, ensure the stored tokens in the database are valid, and re-link the Spotify account if needed. Error details: ' + msg,
-        })
-      }
-      throw err
+    if (playlistError || !created) {
+      throw new Error(`Failed to create playlist: ${playlistError?.message ?? 'unknown error'}`)
     }
 
-    // Filter out null tracks and normalize shape
-    const normalized = normalizePlaylistItems(allTracks)
+    const added: Array<{ title: string; songId: string; position: number; source: 'linked' | 'confirmed' }> = []
+    const skipped: Array<{ title: string; reason?: string }> = [...skippedItems]
 
-    const validTracks = normalized.filter(n => n.track && n.track.id)
+    for (const entry of selectedMatches) {
+      const songId = typeof entry?.songId === 'string' ? entry.songId : null
+      const title = typeof entry?.title === 'string' ? entry.title : 'Unknown song'
+      const position = Number.isFinite(Number(entry?.position)) ? Number(entry.position) : added.length
+      const source = entry?.source === 'linked' ? 'linked' : 'confirmed'
 
-    // Allow a preview mode where we only compute what would be created/linked
-    const preview = Boolean(req.body?.preview)
-
-    // Prepare result buckets
-    const foundResults: Array<{ title: string; songId?: string }> = []
-    const toImportResults: Array<any> = []
-    const skippedResults: Array<{ title: string; reason?: string }> = []
-
-    // Create the playlist in Harmoniq unless this is a preview run
-    let newPlaylist: any = null
-    if (!preview) {
-      const { data: created, error: playlistError } = await supabase
-        .from('playlists')
-        .insert({
-          user_id: userId,
-          name: playlistName || 'Imported from Spotify',
-          spotify_playlist_id: spotifyPlaylistId,
-        })
-        .select()
-        .single()
-
-      if (playlistError) {
-        throw new Error(`Failed to create playlist: ${playlistError.message}`)
+      if (!songId) {
+        skipped.push({ title, reason: 'Missing selected song id' })
+        continue
       }
-      newPlaylist = created
-    } else {
-      newPlaylist = { id: spotifyPlaylistId, name: playlistName || 'Imported from Spotify' }
-    }
-
-    // Process each track: either preview (no writes) or perform real import
-    for (const nItem of validTracks) {
-      const item = nItem.raw
-      const track = nItem.track
-      const trackName = track?.name ?? 'Unknown track'
 
       try {
-        // Determine BPM using centralized helper (Spotify audio-features, then ReccoBeats fallback)
-        const tempoImport = await determineTrackTempo(track.id, accessToken)
-        const bpm = tempoImport ? Math.round(tempoImport) : null
+        await supabase
+          .from('playlist_songs')
+          .insert({ playlist_id: created.id, song_id: songId, position })
 
-        // Check if song with this spotify_id already exists (include bpm to allow conditional update)
-        const { data: existingSong } = await supabase
-          .from('songs')
-          .select('id, bpm, title')
-          .eq('spotify_id', track.id)
-          .single()
-
-        let songId: string | null = null
-
-        if (existingSong) {
-          // Found an existing Harmoniq song linked to this Spotify track
-          songId = existingSong.id
-          foundResults.push({ title: existingSong.title ?? trackName, songId: existingSong.id })
-
-          // If not preview, update BPM when missing
-          if (!preview) {
-            try {
-              if ((existingSong as any).bpm == null && bpm != null) {
-                await supabase.from('songs').update({ bpm }).eq('id', songId)
-              }
-            } catch (e) {
-              console.error('Failed to update existing song bpm', { songId, bpm, error: e })
-            }
-          }
-        } else {
-          // Create artists (prefer spotify_id when present; fallback to name)
-          const artistIds: string[] = []
-          for (const artist of (track.artists || [])) {
-            let existingArtist: any = null
-            // Try find by spotify_id
-            try {
-              const { data: bySpotify } = await supabase
-                .from('artists')
-                .select('id')
-                .eq('spotify_id', artist.id)
-                .single()
-              if (bySpotify) existingArtist = bySpotify
-            } catch (e) {
-              // ignore
-            }
-
-            // Fallback: search by name
-            if (!existingArtist) {
-              try {
-                const { data: byName } = await supabase
-                  .from('artists')
-                  .select('id')
-                  .eq('name', artist.name)
-                  .single()
-                if (byName) existingArtist = byName
-              } catch (e) {
-                // ignore query error
-              }
-            }
-
-            if (existingArtist) {
-              artistIds.push(existingArtist.id)
-            } else if (!preview) {
-              // Only create artists when not in preview mode
-              try {
-                const { data: newArtist } = await supabase
-                  .from('artists')
-                  .insert({ name: artist.name })
-                  .select()
-                  .single()
-
-                if (newArtist) {
-                  artistIds.push(newArtist.id)
-                  // Try to save spotify_id when possible (ignore failures)
-                  try {
-                    if (artist.id) {
-                      await supabase.from('artists').update({ spotify_id: artist.id }).eq('id', newArtist.id)
-                    }
-                  } catch (e) {
-                    // ignore
-                  }
-                } else {
-                  // If insert didn't return a row, try to find by name again (concurrent insert)
-                  try {
-                    const { data: maybe } = await supabase
-                      .from('artists')
-                      .select('id')
-                      .eq('name', artist.name)
-                      .single()
-                    if (maybe) artistIds.push(maybe.id)
-                  } catch (e) {
-                    // ignore
-                  }
-                }
-              } catch (e) {
-                // Insert error: try to find by name as a fallback
-                try {
-                  const { data: maybe } = await supabase
-                    .from('artists')
-                    .select('id')
-                    .eq('name', artist.name)
-                    .single()
-                  if (maybe) artistIds.push(maybe.id)
-                } catch (ee) {
-                  // ignore
-                }
-              }
-            }
-          }
-
-          // Create album
-          let albumId: string | null = null
-          if (track.album) {
-            // Prefer lookup by spotify album id
-            let existingAlbum: any = null
-            try {
-              const { data: bySpotify } = await supabase
-                .from('albums')
-                .select('id')
-                .eq('spotify_id', track.album.id)
-                .single()
-              if (bySpotify) existingAlbum = bySpotify
-            } catch (e) {
-              // ignore
-            }
-
-            if (!existingAlbum) {
-              try {
-                const { data: byName } = await supabase
-                  .from('albums')
-                  .select('id')
-                  .eq('name', track.album.name)
-                  .single()
-                if (byName) existingAlbum = byName
-              } catch (e) {
-                // ignore
-              }
-            }
-
-            if (existingAlbum) {
-              albumId = existingAlbum.id
-            } else if (!preview) {
-              try {
-                const { data: newAlbum } = await supabase
-                  .from('albums')
-                  .insert({ name: track.album.name })
-                  .select()
-                  .single()
-
-                if (newAlbum) {
-                  albumId = newAlbum.id
-                  // Try to save spotify_id when possible (ignore failures)
-                  try {
-                    if (track.album?.id) {
-                      await supabase.from('albums').update({ spotify_id: track.album.id }).eq('id', newAlbum.id)
-                    }
-                  } catch (e) {
-                    // ignore
-                  }
-
-                  // Link album to artists
-                  for (const artistId of artistIds) {
-                    try {
-                      await supabase
-                        .from('album_artists')
-                        .insert({ album_id: albumId, artist_id: artistId })
-                        .single()
-                    } catch (e) {
-                      console.error('Failed to link album to artist', { albumId, artistId, error: e })
-                    }
-                  }
-                } else {
-                  // Try to find by name as fallback
-                  try {
-                    const { data: maybe } = await supabase
-                      .from('albums')
-                      .select('id')
-                      .eq('name', track.album.name)
-                      .single()
-                    if (maybe) albumId = maybe.id
-                  } catch (e) {
-                    // ignore
-                  }
-                }
-              } catch (e) {
-                // Insert error fallback
-                try {
-                  const { data: maybe } = await supabase
-                    .from('albums')
-                    .select('id')
-                    .eq('name', track.album.name)
-                    .single()
-                  if (maybe) albumId = maybe.id
-                } catch (ee) {
-                  // ignore
-                }
-              }
-            }
-          }
-
-          // Extract year from release_date
-          const yearReleased = track.album?.release_date
-            ? parseInt(track.album.release_date.split('-')[0])
-            : null
-
-          // Create song (store spotify_id only; spotify_url column will be removed)
-          let newSong: any = null
-          let songError: any = null
-          if (!preview) {
-            try {
-              const insertRes = await supabase
-                .from('songs')
-                .insert({
-                  title: trackName,
-                  album_id: albumId,
-                  year_released: yearReleased,
-                  user_id: userId,
-                  spotify_id: track.id,
-                  bpm: bpm ?? null,
-                })
-                .select()
-                .single()
-
-              newSong = insertRes.data
-              songError = insertRes.error
-            } catch (e) {
-              songError = e
-            }
-
-            if (songError || !newSong) {
-              skippedResults.push({ title: trackName, reason: 'Failed to create song' })
-              continue
-            }
-
-            songId = newSong.id
-
-            // If artistIds is empty for some reason, try to resolve by name before linking
-            if ((artistIds || []).length === 0) {
-              for (const artist of (track.artists || [])) {
-                try {
-                  const { data: maybe } = await supabase
-                    .from('artists')
-                    .select('id')
-                    .eq('name', artist.name)
-                    .single()
-                  if (maybe) artistIds.push(maybe.id)
-                } catch (e) {
-                  // ignore
-                }
-              }
-            }
-
-            // Link song to artists (only when not preview)
-            for (const artistId of (artistIds || [])) {
-              try {
-                await supabase
-                  .from('song_artists')
-                  .insert({ song_id: songId, artist_id: artistId })
-                  .single()
-              } catch (e) {
-                console.error('Failed to link song to artist', { songId, artistId, error: e })
-              }
-            }
-          } else {
-            // preview mode: do not write any DB rows; songId remains null
-            songId = null
-          }
-
-          // Record import detail
-          const importDetail = {
-            title: trackName,
-            spotify_id: track.id,
-            artists: (track.artists || []).map((a: any) => a.name),
-            album: track.album?.name ?? null,
-            year_released: yearReleased,
-            bpm,
-            songId: songId,
-          }
-
-          toImportResults.push(importDetail)
-        }
-
-        // Add song to playlist (only when not preview)
-        if (!preview && songId) {
-          try {
-            await supabase
-              .from('playlist_songs')
-              .insert({ playlist_id: newPlaylist.id, song_id: songId })
-          } catch (e) {
-            console.error('Failed to add song to playlist', { playlistId: newPlaylist?.id, songId, error: e })
-            skippedResults.push({ title: trackName, reason: 'Failed to add to playlist' })
-            continue
-          }
-        }
-      } catch (err: any) {
-        skippedResults.push({ title: trackName, reason: String((err as any)?.message || err) })
+        added.push({ title, songId, position, source })
+      } catch (error) {
+        skipped.push({ title, reason: 'Failed to add to playlist' })
       }
     }
 
-    // Respond with categorized results
-    res.json({
+    return res.json({
       success: true,
-      playlist: newPlaylist,
-      counts: {
-        found: foundResults.length,
-        imported: toImportResults.length,
-        skipped: skippedResults.length,
+      playlist: {
+        id: created.id,
+        name: created.name,
       },
-      found: foundResults,
-      imported: toImportResults,
-      skipped: skippedResults,
+      counts: {
+        linked: added.filter((entry) => entry.source === 'linked').length,
+        confirmed: added.filter((entry) => entry.source === 'confirmed').length,
+        unmatched: unmatchedItems.length,
+        skipped: skipped.length,
+      },
+      added,
+      unmatched: unmatchedItems,
+      skipped,
     })
   } catch (err: any) {
-    console.error('Import error:', err)
+    console.error('Import playlist error:', err)
     res.status(500).json({ error: err.message })
   }
 })

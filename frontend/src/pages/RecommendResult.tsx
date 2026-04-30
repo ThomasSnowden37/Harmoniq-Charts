@@ -14,7 +14,7 @@ interface Song {
     bpm: number
     genre: string
     album: string
-    song_writer: string
+  credits: string
     artist: string
     rating: number | null
 }
@@ -30,7 +30,7 @@ export default function RecommendResult() {
   const [error, setError] = useState<string | null>(null)
   const [artistLikeness, setArtistLikeness] = useState(false);
   const [albumLikeness, setAlbumLikeness] = useState(false);
-  const [songwriterLikeness, setSongwriterLikeness] = useState(false);
+  const [creditLikeness, setCreditLikeness] = useState(false);
   const [bpmLikeness, setBpmLikeness] = useState(false);
   const [genreLikeness, setGenreLikeness] = useState(false);
   const [ratingLikeness, setRatingLikeness] = useState(false);
@@ -391,7 +391,7 @@ export default function RecommendResult() {
               </div>
 
               <div className="text-sm text-muted-foreground mt-1">
-                 Songwriter(s): {targetSong?.song_writer}
+                  Credits: {targetSong?.credits || 'No credits listed'}
               </div>
 
               <div className="text-sm text-muted-foreground mt-1">
@@ -485,8 +485,8 @@ export default function RecommendResult() {
               </label>
 
               <label className="flex items-center gap-1 whitespace-nowrap">
-                <input type="checkbox" checked={songwriterLikeness} onChange={(e) => setSongwriterLikeness(e.target.checked)} />
-                Song Writers
+                <input type="checkbox" checked={creditLikeness} onChange={(e) => setCreditLikeness(e.target.checked)} />
+                Credits
               </label>
               
               <label className="flex items-center gap-1 whitespace-nowrap">

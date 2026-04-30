@@ -1,353 +1,304 @@
 import { useState } from 'react'
-import { Form } from "radix-ui";
-import {
-  Box,
-  Button,
-  Card,
-  Flex,
-  Heading,
-  Text,
-} from '@radix-ui/themes'
+import { Box, Button, Card, Flex, Heading, Text } from '@radix-ui/themes'
+import { ArrowRight, CheckCircle2, Disc3 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { useAuth } from '../context/AuthContext';
-import { useSpotify } from '../features/spotify/context/SpotifyContext'
-import { LinkSpotifyTrackModal } from '../features/spotify/components/LinkSpotifyTrackModal'
-import type { SpotifyTrack } from '../features/spotify/types'
+import { useAuth } from '../context/AuthContext'
+import CandidateMatchesPanel from '../features/proposals/components/CandidateMatchesPanel'
+import { ProposalApiError, submitProposal } from '../features/proposals/api'
+import type { CandidateMatch } from '../features/proposals/types'
+import SongContributorEditor, {
+  SONG_FORM_LIMITS,
+  artistNamesText,
+  serializeProposalArtists,
+  serializeProposalCredits,
+  type ArtistSelection,
+  type SongCreditDraft,
+} from '../features/songs/components/SongContributorEditor'
+import { InlineSpotifyPicker } from '../features/spotify/components/InlineSpotifyPicker'
+import type { SpotifyLookupItem, SpotifyTrack } from '../features/spotify/types'
 
-/**
- * TODO:
- * Make more navigable 
- * Make Error Codes better for users
- */
+type NoticeTone = 'success' | 'error' | null
 
-/**
- * CreateSong.tsx
- *
- * Description:
- * This UI allows the user to add a new song to the database
- *  
- * Author: Jonas Langer
- * 
- */
+function noticeClasses(tone: NoticeTone): string {
+  if (tone === 'success') {
+    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+  }
+
+  if (tone === 'error') {
+    return 'border-red-500/30 bg-red-500/10 text-red-200'
+  }
+
+  return 'border-border/70 bg-background/70 text-foreground'
+}
+
+function formatTrackYear(track: SpotifyTrack | null): string {
+  if (!track?.album?.release_date) return 'Unknown'
+  return track.album.release_date.split('-')[0] || 'Unknown'
+}
+
+function artistNames(track: SpotifyTrack | null): string {
+  return track?.artists?.map((artist) => artist.name).join(', ') || 'Unknown artist'
+}
 
 export default function CreateSong() {
   const { user } = useAuth()
-  const { isConnected: spotifyConnected } = useSpotify()
+  const [title, setTitle] = useState('')
+  const [artists, setArtists] = useState<ArtistSelection[]>([])
+  const [credits, setCredits] = useState<SongCreditDraft[]>([])
+  const [albumName, setAlbumName] = useState('')
+  const [genre, setGenre] = useState('')
+  const [bpm, setBpm] = useState('')
+  const [yearReleased, setYearReleased] = useState('')
+  const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [spotifyModalOpen, setSpotifyModalOpen] = useState(false)
-  const [linkedSpotifyTrack, setLinkedSpotifyTrack] = useState<SpotifyTrack | null>(null)
-  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [noticeTone, setNoticeTone] = useState<NoticeTone>(null)
+  const [matches, setMatches] = useState<CandidateMatch[]>([])
+  const [selectedSpotifyItem, setSelectedSpotifyItem] = useState<SpotifyLookupItem | null>(null)
+  const [selectedSpotifyTrack, setSelectedSpotifyTrack] = useState<SpotifyTrack | null>(null)
 
- const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
-    setMessage(null)
-    
-    if (!user) {
-        setMessage("You must be logged in to add a song\n")
-        setLoading(false)
-        return;
+  function resetManualForm() {
+    setTitle('')
+    setArtists([])
+    setCredits([])
+    setAlbumName('')
+    setGenre('')
+    setBpm('')
+    setYearReleased('')
+    setReason('')
+    setMatches([])
+    setSelectedSpotifyItem(null)
+    setSelectedSpotifyTrack(null)
+  }
+
+  async function fetchTrackDetails(trackId: string): Promise<SpotifyTrack> {
+    const response = await fetch(`/api/spotify/tracks/${trackId}`, {
+      headers: user ? { 'x-user-id': user.id } : undefined,
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to load Spotify track details')
     }
-    const userId = user.id;
 
-    const forms = e.currentTarget
-    const form = new FormData(e.currentTarget)
-    const title = form.get('title')?.toString() ?? ''
-    const bpmRaw = form.get('bpm')?.toString() ?? ''
-    const bpm = bpmRaw === '' ? null : Number(bpmRaw)
-    const genreRaw = form.get('genre')?.toString() ?? ''
-    const genre = genreRaw === '' ? null : genreRaw
-    const year_released = Number(form.get('year_released') ?? 0)
-    const album_name = form.get('album')?.toString() ?? ''
-    const artist_name = form.get('artist')?.toString() ?? ''
+    return response.json()
+  }
+
+  async function handleManualSubmit(ignoreMatches = false) {
+    if (!user) {
+      setNoticeTone('error')
+      setNotice('You must be logged in to submit a song suggestion.')
+      return
+    }
+
+    setLoading(true)
+    setNotice(null)
+    setNoticeTone(null)
+
+    const proposalArtists = serializeProposalArtists(artists)
+    const proposalCredits = serializeProposalCredits(credits)
+
     try {
-        const res = await fetch('/api/songs/add', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-user-id': userId,},
-          body: JSON.stringify({
-            userId: userId,
-            title,
-            bpm,
-            genre,
-            year_released,  
-            album_name,
-            artist_name,
-            spotify_id: linkedSpotifyTrack?.id || null,
-          }),
+      await submitProposal({
+        userId: user.id,
+        type: 'song_add',
+        reason: reason.trim(),
+        ignoreMatches,
+        payload: {
+          title: title.trim().slice(0, SONG_FORM_LIMITS.title),
+          artist_name: artistNamesText(artists),
+          artists: proposalArtists,
+          album_name: albumName.trim().slice(0, SONG_FORM_LIMITS.album),
+          genre: genre.trim().slice(0, SONG_FORM_LIMITS.genre) || null,
+          bpm: bpm ? Number(bpm) : null,
+          year_released: yearReleased ? Number(yearReleased) : null,
+          credits: proposalCredits,
+          spotify_id: selectedSpotifyTrack?.id ?? null,
+        },
       })
-      const data = await res.json()
 
-      if (!res.ok) throw new Error(data.error || 'Failed to add song')
-
-      forms.reset()
-      setLinkedSpotifyTrack(null)
-      setMessage('Song Successfully Added')
-
-    } catch (err: any) {
-      console.error('Request failed:', err)
-      setMessage(`Request failed: ${err.message}`)
+      resetManualForm()
+      setNoticeTone('success')
+      setNotice('Suggestion submitted. The song will stay pending until it is reviewed.')
+    } catch (submitError) {
+      if (submitError instanceof ProposalApiError && submitError.needsConfirmation) {
+        setMatches(submitError.candidateMatches ?? [])
+        setNoticeTone('error')
+        setNotice('Possible duplicate songs were found. Review them or submit anyway if this entry is genuinely different.')
+      } else {
+        setNoticeTone('error')
+        setNotice(submitError instanceof Error ? submitError.message : 'Failed to submit suggestion')
+      }
     } finally {
       setLoading(false)
     }
-  } 
+  }
 
-return (
-  <Box className="min-h-screen bg-background flex flex-col">
-    <Navbar />
-    <Box className="flex-1 flex items-center justify-center p-6">
-    <Card size="3" className="w-full max-w-xl p-6">
-      <Heading size="6" mb="5">
-        Add New Song
-      </Heading>
+  async function handleSpotifySelection(item: SpotifyLookupItem | null) {
+    setSelectedSpotifyItem(item)
 
-    <Form.Root asChild>
-      <form onSubmit={handleSubmit} onChange={() => message && setMessage(null)}>
-        {/* Title */}
-        <Form.Field name="title" className="mb-4">
-            <Form.Label className="FormLabel text-foreground mb-1">
-              Title</Form.Label>
-            <Form.Control asChild>
-              <input
-                name="title"
-                className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
-                 data-[invalid]:data-[touched]:border-destructive 
-                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
-                required  />
-              </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
-                Please enter a title
-              </Form.Message>
-            </Form.Field>
+    if (!item) {
+      setSelectedSpotifyTrack(null)
+      return
+    }
 
-         {/* bpm */}
-        <Form.Field name="bpm" className="mb-4">
-            <Form.Label className="FormLabel text-foreground mb-1">
-                BPM</Form.Label>
-              <Form.Control asChild>
-                  <input
-                    name="bpm"
-                    type="number"
-                    min={0}
-                    className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
-                   data-[invalid]:data-[touched]:border-destructive 
-                   focus:data-[invalid]:data-[touched]:invalid:border-destructive"
-                  />
-              </Form.Control>
-              <Form.Message match="rangeUnderflow" className="text-destructive text-sm mt-1">
-                BPM must be greater than 0
-            </Form.Message>
-            </Form.Field>
+    const detailedTrack = await fetchTrackDetails(item.id)
+    setSelectedSpotifyTrack(detailedTrack)
+  }
 
-            {/* Genre */} 
-         <Form.Field name="genre" className="mb-4">
-            <Form.Label className="FormLabel text-foreground mb-1">
-                Genre</Form.Label>
-              <Form.Control asChild>
-                <input
-                  name="genre"
-                  className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
-                  data-[invalid]:data-[touched]:border-destructive 
-                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
-                />
-              </Form.Control>
-            
-            </Form.Field>
+  const canSubmitSuggestion = Boolean(
+    title.trim() && artists.length > 0 && albumName.trim() && yearReleased.trim(),
+  )
 
-         {/* Year Released  */}    
-        <Form.Field name="year_released" className="mb-4">
-            <Form.Label className="FormLabel text-foreground mb-1">
-                Year Released</Form.Label>
-              <Form.Control asChild>
-                <input
-                  name="year_released"
-                  type="number"
-                  min={0}
-                  className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
-                 data-[invalid]:data-[touched]:border-destructive 
-                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
-                  required  
-                />
-              </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
-                Please enter a Year
-              </Form.Message>
-              <Form.Message match="rangeUnderflow" className="text-destructive text-sm mt-1">
-                Year must be greater than 0
-            </Form.Message>
-            </Form.Field>
-
-         {/* Album */}    
-        <Form.Field name="album" className="mb-4">
-            <Form.Label className="FormLabel text-foreground mb-1">
-              Album</Form.Label>
-            <Form.Control asChild>
-              <input
-                name="album"
-                className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
-                 data-[invalid]:data-[touched]:border-destructive 
-                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
-                required  />
-              </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
-                Please enter an album
-              </Form.Message>
-            </Form.Field>
-
-         {/* Artist */}    
-        <Form.Field name="artist" className="mb-4">
-            <Form.Label className="FormLabel text-foreground mb-1">
-              Artist</Form.Label>
-            <Form.Control asChild>
-              <input
-                name="artist"
-                className="Input w-full px-3 py-2 rounded text-foreground bg-card border border-border
-                 data-[invalid]:data-[touched]:border-destructive 
-                 focus:data-[invalid]:data-[touched]:invalid:border-destructive"
-                required  />
-              </Form.Control>
-              <Form.Message match="valueMissing" className="FormMessage text-destructive text-sm mt-1">
-                Please enter an artist
-              </Form.Message>
-            </Form.Field>
-
-          {/* Spotify Link Section */}
-          {spotifyConnected && (
-            <Box className="mb-4 p-3 border border-border rounded-lg bg-card/50">
-              <Text as="label" size="2" weight="medium" className="text-foreground mb-2 block">
-                Link to Spotify (Optional)
-              </Text>
-              {linkedSpotifyTrack ? (
-                <Flex justify="between" align="center" gap="2">
-                  <Flex gap="2" align="center">
-                    {linkedSpotifyTrack.album && linkedSpotifyTrack.album.images && linkedSpotifyTrack.album.images[2] && linkedSpotifyTrack.album.images[2].url && (
-                      <img 
-                        src={linkedSpotifyTrack.album.images[2].url} 
-                        alt="" 
-                        className="w-10 h-10 rounded"
-                      />
-                    )}
-                    <Box>
-                      <Text size="2" weight="medium">{linkedSpotifyTrack.name}</Text>
-                      <Text size="1" color="gray">
-                        {linkedSpotifyTrack.artists?.map(a => a.name).join(', ')}
-                      </Text>
-                    </Box>
-                  </Flex>
-                  <Button 
-                    type="button" 
-                    variant="soft" 
-                    color="red" 
-                    size="1"
-                    onClick={() => setLinkedSpotifyTrack(null)}
-                  >
-                    Remove
-                  </Button>
-                </Flex>
-              ) : (
-                <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="soft" 
-                  color="green"
-                  onClick={() => setSpotifyModalOpen(true)}
-                >
-                  🎵 Link Spotify Track
-                </Button>
-                <Button
-                  type="button"
-                  variant="soft"
-                  color="green"
-                  onClick={() => setImportModalOpen(true)}
-                >
-                  ⬇️ Import from Spotify
-                </Button>
-                </div>
-              )}
-            </Box>
+  return (
+    <Box className="min-h-screen bg-background flex flex-col">
+      <Navbar />
+      <Box className="flex-1 px-4 py-8 md:px-8">
+        <div className="mx-auto max-w-6xl space-y-6">
+          {notice && (
+            <div className={`rounded-2xl border px-4 py-4 text-sm ${noticeClasses(noticeTone)}`}>
+              <Flex align="center" gap="2">
+                {noticeTone === 'success' && <CheckCircle2 className="h-4 w-4" />}
+                <span>{notice}</span>
+              </Flex>
+            </div>
           )}
-          
-           {/* Buttons */}
-           <Flex justify="end" gap="2" mt="4">
-            <Button
-                type="submit"
-                disabled={loading}
-                className={`px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 ${
-                loading ? 'opacity-70 cursor-wait' : ''
-                }`}>
-                {loading ? 'Adding…' : 'Add Song'}
-              </Button>
-            </Flex>
-          </form>
-        </Form.Root>
-        {message && (
-          <Text size="2" mt="3" color="blue">
-            {message}
-          </Text> )}
-      </Card>
 
-      {/* Spotify Link Modal */}
-      <LinkSpotifyTrackModal
-        open={spotifyModalOpen}
-        onOpenChange={setSpotifyModalOpen}
-        songTitle=""
-        currentSpotifyId={linkedSpotifyTrack?.id}
-        onLink={async (spotifyId) => {
-          // Fetch track details to store
-          const response = await fetch(`/api/spotify/tracks/${spotifyId}`, {
-            headers: { 'x-user-id': user?.id || '' },
-          })
-          if (response.ok) {
-            const track = await response.json()
-            setLinkedSpotifyTrack(track)
-          }
-        }}
-        onUnlink={async () => {
-          setLinkedSpotifyTrack(null)
-        }}
-      />
-      {/* Spotify Import Modal (pre-fill fields) */}
-      <LinkSpotifyTrackModal
-        open={importModalOpen}
-        onOpenChange={setImportModalOpen}
-        songTitle=""
-        currentSpotifyId={linkedSpotifyTrack?.id}
-        onLink={async (spotifyId) => {
-          // Fetch extended track details (includes audioFeatures and genres)
-          const response = await fetch(`/api/spotify/tracks/${spotifyId}`, {
-            headers: { 'x-user-id': user?.id || '' },
-          })
-          if (!response.ok) {
-            throw new Error('Failed to fetch Spotify track')
-          }
+          <div className="grid gap-6 xl:grid-cols-[1.45fr_0.85fr]">
+            <Card size="3" className="border border-border/70 bg-card/90 backdrop-blur-sm">
+              <div className="space-y-5 p-1">
+                <div>
+                  <Text size="1" className="uppercase tracking-[0.28em] text-foreground/60">Entry Form</Text>
+                  <Heading size="6" className="mt-2">Suggest a new song</Heading>
+                  <Text size="2" color="gray" className="mt-2 block">
+                    This form will open a proposal for other users to review.
+                  </Text>
+                </div>
 
-          const data = await response.json()
+                <CandidateMatchesPanel matches={matches} />
 
-          // Helper to set uncontrolled input values
-          const setInputValue = (name: string, value: any) => {
-            const el = document.querySelector<HTMLInputElement>(`input[name="${name}"]`)
-            if (el) el.value = value ?? ''
-          }
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-1.5">
+                    <Text size="2" weight="medium">Title</Text>
+                    <input
+                      value={title}
+                      maxLength={SONG_FORM_LIMITS.title}
+                      onChange={(event) => setTitle(event.target.value.slice(0, SONG_FORM_LIMITS.title))}
+                      className="w-full rounded-2xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
+                      placeholder="Song title"
+                    />
+                  </label>
 
-          setInputValue('title', data.name || '')
-          setInputValue('bpm', data.bpm ?? (data.audioFeatures?.tempo ? Math.round(data.audioFeatures.tempo) : ''))
-          setInputValue('genre', data.primaryGenre ?? (data.genres && data.genres.length > 0 ? data.genres[0] : ''))
-          setInputValue('year_released', data.album?.release_date ? parseInt(data.album.release_date.split('-')[0]) : '')
-          setInputValue('album', data.album?.name || '')
-          setInputValue('artist', data.artists?.map((a: any) => a.name).join(', ') || '')
+                  <label className="space-y-1.5">
+                    <Text size="2" weight="medium">Album</Text>
+                    <input
+                      value={albumName}
+                      maxLength={SONG_FORM_LIMITS.album}
+                      onChange={(event) => setAlbumName(event.target.value.slice(0, SONG_FORM_LIMITS.album))}
+                      className="w-full rounded-2xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
+                      placeholder="Album name"
+                    />
+                  </label>
 
-          // Keep a reference to the linked Spotify track
-          setLinkedSpotifyTrack(data)
-        }}
-        onUnlink={async () => {
-          setLinkedSpotifyTrack(null)
-        }}
-      />
-      </Box> 
-        <Footer />
+                  <div className="md:col-span-2">
+                    <SongContributorEditor artists={artists} onArtistsChange={setArtists} credits={credits} onCreditsChange={setCredits} />
+                  </div>
+
+                  <label className="space-y-1.5">
+                    <Text size="2" weight="medium">Genre</Text>
+                    <input
+                      value={genre}
+                      maxLength={SONG_FORM_LIMITS.genre}
+                      onChange={(event) => setGenre(event.target.value.slice(0, SONG_FORM_LIMITS.genre))}
+                      className="w-full rounded-2xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
+                      placeholder="Genre"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <Text size="2" weight="medium">BPM</Text>
+                    <input
+                      value={bpm}
+                      onChange={(event) => setBpm(event.target.value)}
+                      type="number"
+                      min={0}
+                      max={SONG_FORM_LIMITS.bpm}
+                      className="w-full rounded-2xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
+                      placeholder="Optional"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5 md:col-span-2">
+                    <Text size="2" weight="medium">Year Released</Text>
+                    <input
+                      value={yearReleased}
+                      onChange={(event) => setYearReleased(event.target.value)}
+                      type="number"
+                      min={0}
+                      max={SONG_FORM_LIMITS.year}
+                      className="w-full rounded-2xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
+                      placeholder="Release year"
+                    />
+                  </label>
+                </div>
+
+                <label className="block space-y-1.5">
+                  <Text size="2" weight="medium">Reasoning / sources (optional)</Text>
+                  <textarea
+                    value={reason}
+                    maxLength={SONG_FORM_LIMITS.reason}
+                    onChange={(event) => setReason(event.target.value.slice(0, SONG_FORM_LIMITS.reason))}
+                    rows={4}
+                    className="w-full rounded-2xl border border-border bg-background px-3 py-3 text-sm text-foreground"
+                    placeholder="Add context for reviewers if it helps."
+                  />
+                </label>
+
+                <Flex justify="between" align="center" gap="3" wrap="wrap">
+                  <Text size="2" color="gray">Suggestions stay pending until review. You can optionally attach a Spotify track.</Text>
+                  <Flex gap="2" wrap="wrap" justify="end">
+                    {matches.length > 0 && (
+                      <Button variant="soft" color="orange" disabled={loading || !canSubmitSuggestion} onClick={() => void handleManualSubmit(true)}>
+                        {loading ? 'Submitting...' : 'Submit anyway'}
+                      </Button>
+                    )}
+                    <Button disabled={loading || !canSubmitSuggestion} onClick={() => void handleManualSubmit(false)}>
+                      {loading ? 'Submitting...' : 'Submit suggestion'}
+                      {!loading && <ArrowRight className="ml-1 h-4 w-4" />}
+                    </Button>
+                  </Flex>
+                </Flex>
+              </div>
+            </Card>
+
+            <Card size="3" className="border border-border/70 bg-card/90">
+              <div className="space-y-5 p-1">
+                <div>
+                  <Text size="1" className="uppercase tracking-[0.28em] text-foreground/60">Platform Linking</Text>
+                  <Heading size="6" className="mt-2">Attach a Spotify track</Heading>
+                </div>
+
+                <div className="space-y-3 rounded-3xl border border-border/60 bg-[linear-gradient(160deg,rgba(16,185,129,0.12),rgba(10,10,10,0.22))] p-4">
+                  <InlineSpotifyPicker
+                    entityType="track"
+                    userId={user?.id ?? null}
+                    value={selectedSpotifyItem}
+                    onChange={(item) => {
+                      void handleSpotifySelection(item)
+                    }}
+                    label="Spotify track"
+                    description="Search inline or paste a Spotify track link."
+                    placeholder="Search Spotify or paste a track link"
+                    suggestedQuery={[title.trim(), artistNamesText(artists)].filter(Boolean).join(' ')}
+                  />
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+
+      </Box>
+      <Footer />
     </Box>
   )
 }
-
-

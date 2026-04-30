@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { supabase } from '../lib/supabase.js'
+import { isAdminUser } from '../lib/admin.js'
 import { v5 as uuidv5 } from 'uuid';
 
 /**
@@ -18,7 +19,7 @@ const NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
 router.post('/google-sync', async (req, res) => {
   // Destructure the keys coming from the frontend AuthContext
-  const { id, email, username } = req.body;
+  const { id, email, username, picture_url: requestedPictureUrl } = req.body;
 
   // Check if 'id' (the Google sub) exists before hashing
   if (!id) {
@@ -28,15 +29,21 @@ router.post('/google-sync', async (req, res) => {
   try {
     // Generate the UUID
     const userUuid = uuidv5(id, NAMESPACE);
+    const defaultPictureUrl = requestedPictureUrl || null;
 
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: existingUserError } = await supabase
       .from('users')
-      .select('*')
+      .select('id, username, email, privacy, created_at, picture_url')
       .eq('id', userUuid)
-      .single();
+      .maybeSingle();
+
+    if (existingUserError) throw existingUserError;
 
     if (existingUser) {
-      return res.json(existingUser);
+      return res.json({
+        ...existingUser,
+        is_admin: await isAdminUser(userUuid),
+      });
     }
 
     const { data: newUser, error } = await supabase
@@ -45,13 +52,29 @@ router.post('/google-sync', async (req, res) => {
         id: userUuid, 
         email: email, 
         username: username, 
-        privacy: 'public' 
+        privacy: 'public',
+        picture_url: defaultPictureUrl || null,
       })
-      .select()
+      .select('id, username, email, privacy, created_at, picture_url')
       .single();
 
     if (error) throw error;
-    res.json(newUser);
+
+
+    // create the listen later playlist
+    const { error: playlistError} = await supabase
+      .from('playlists')
+      .insert({
+        user_id: newUser.id,
+        name: 'Listen Later',
+        permanent: true,
+      })
+    if (playlistError) throw playlistError;
+
+    res.json({
+      ...newUser,
+      is_admin: false,
+    });
 
   } catch (err: any) {
     console.error("Supabase Sync Error:", err.message);

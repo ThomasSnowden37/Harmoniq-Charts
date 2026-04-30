@@ -3,7 +3,7 @@ import { Dialog, Button, Flex, Text, ScrollArea, Spinner, TextField } from '@rad
 import { X } from 'lucide-react'
 import { MOCK_CURRENT_USER_ID } from '../../../lib/auth'
 import { useSpotify } from '../context/SpotifyContext'
-import type { SpotifyPlaylist, ImportResult } from '../types'
+import type { SpotifyPlaylist, ImportResult, PlaylistImportPreview } from '../types'
 
 interface ImportPlaylistModalProps {
   isOpen: boolean
@@ -20,11 +20,12 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
   const [selectedPlaylist, setSelectedPlaylist] = useState<SpotifyPlaylist | null>(null)
   const [customName, setCustomName] = useState('')
   const [result, setResult] = useState<ImportResult | null>(null)
-  const [preview, setPreview] = useState<any | null>(null)
+  const [preview, setPreview] = useState<PlaylistImportPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const previewControllerRef = useRef<AbortController | null>(null)
   const [previewProgress, setPreviewProgress] = useState(0)
   const [previewTotal, setPreviewTotal] = useState<number | null>(null)
+  const [selectedMatches, setSelectedMatches] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (isOpen && isConnected) {
@@ -38,6 +39,7 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
       setCustomName('')
       setResult(null)
       setPreview(null)
+      setSelectedMatches({})
       setError(null)
     }
   }, [isOpen])
@@ -69,7 +71,41 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
   // Perform the actual import (commits to DB)
   async function handleImport() {
     const pl = selectedPlaylist
-    if (!pl) return
+    if (!pl || !preview) return
+
+    const linkedSelections = preview.items
+      .filter((item) => item.matchState === 'linked' && item.songId)
+      .map((item) => ({
+        trackId: item.trackId,
+        songId: item.songId as string,
+        title: item.matchedTitle ?? item.title,
+        position: item.position,
+        source: 'linked' as const,
+      }))
+
+    const confirmedSelections = preview.items
+      .filter((item) => item.matchState === 'match_available' && selectedMatches[item.trackId])
+      .map((item) => ({
+        trackId: item.trackId,
+        songId: selectedMatches[item.trackId],
+        title: item.title,
+        position: item.position,
+        source: 'confirmed' as const,
+      }))
+
+    const unresolvedMatches = preview.items
+      .filter((item) => item.matchState === 'match_available' && !selectedMatches[item.trackId])
+      .map((item) => ({ title: item.title, reason: 'No confident match was confirmed' }))
+
+    const unmatchedItems = preview.items
+      .filter((item) => item.matchState === 'no_match')
+      .map((item) => ({ title: item.title, trackId: item.trackId }))
+
+    const chosenMatches = [...linkedSelections, ...confirmedSelections]
+    if (chosenMatches.length === 0) {
+      setError('Choose at least one exact or confident match before importing.')
+      return
+    }
 
     setImporting(true)
     setError(null)
@@ -83,7 +119,9 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
         body: JSON.stringify({
           spotifyPlaylistId: pl.id,
           playlistName: customName || pl.name,
-          preview: false,
+          selectedMatches: chosenMatches,
+          unmatchedItems,
+          skippedItems: [...preview.skipped, ...unresolvedMatches],
         }),
       })
 
@@ -113,6 +151,7 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
     setPreviewLoading(true)
     setError(null)
     setPreview(null)
+    setSelectedMatches({})
     setPreviewProgress(0)
     setPreviewTotal(null)
 
@@ -139,10 +178,6 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
       const decoder = new TextDecoder()
       let buffer = ''
 
-      // incremental preview structure
-      const partial = { found: [] as any[], imported: [] as any[], skipped: [] as any[], counts: { found: 0, imported: 0, skipped: 0 }, total: 0 }
-      setPreview(partial)
-
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -155,25 +190,14 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
           try { msg = JSON.parse(line) } catch (e) { continue }
 
           if (msg.type === 'init') {
-            partial.total = msg.total || 0
-            setPreviewTotal(partial.total)
-            setPreview({ ...partial })
+            setPreviewTotal(msg.total || 0)
           } else if (msg.type === 'item') {
-            const it = msg.item
-            if (it.found) {
-              partial.found.push(it)
-              partial.counts.found = partial.found.length
-            } else {
-              partial.imported.push(it)
-              partial.counts.imported = partial.imported.length
-            }
             const progress = (msg.index + 1) / (msg.total || 1)
             setPreviewProgress(progress)
-            setPreview({ ...partial })
           } else if (msg.type === 'complete') {
             setPreview(msg)
             setPreviewProgress(1)
-            setPreviewTotal(msg.counts?.found + msg.counts?.imported + msg.counts?.skipped || null)
+            setPreviewTotal((msg.items?.length ?? 0) + (msg.skipped?.length ?? 0) || null)
           }
         }
       }
@@ -251,50 +275,44 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
             <div className="bg-card/50 border border-border rounded-lg p-4">
               <Text weight="medium" color="green">Successfully imported "{result.playlist.name}"</Text>
               <Text size="2" color="gray" as="p" mt="2">
-                {result.counts?.imported ?? (Array.isArray((result as any).imported) ? (result as any).imported.length : 0)} songs imported
-                {(result.counts?.skipped ?? 0) > 0 && `, ${result.counts?.skipped ?? 0} skipped`}
+                {result.counts.linked + result.counts.confirmed} songs added
+                {result.counts.unmatched > 0 && `, ${result.counts.unmatched} still need contributions`}
+                {(result.counts.skipped ?? 0) > 0 && `, ${result.counts.skipped ?? 0} skipped`}
               </Text>
             </div>
 
-            {/* Found */}
-            {result.found && result.found.length > 0 && (
+            {result.added && result.added.length > 0 && (
               <div>
-                <Text size="2" weight="medium">Found (already linked)</Text>
+                <Text size="2" weight="medium">Added to playlist</Text>
                 <ScrollArea style={{ maxHeight: '120px' }} className="mt-2">
-                  {result.found.map((f: any, i: number) => (
+                  {result.added.map((entry, i) => (
                     <div key={i} className="py-2 border-b border-border last:border-none">
-                      <Text weight="medium" className="block">{f.title}</Text>
-                      {f.songId && <Text size="1" color="gray" className="block mt-1">Already linked</Text>}
+                      <Text weight="medium" className="block">{entry.title}</Text>
+                      <Text size="1" color="gray" className="block mt-1">
+                        {entry.source === 'linked' ? 'Exact linked song' : 'Confirmed community match'}
+                      </Text>
                     </div>
                   ))}
                 </ScrollArea>
               </div>
             )}
 
-            {/* Imported details */}
-            {result.imported && result.imported.length > 0 && (
+            {result.unmatched && result.unmatched.length > 0 && (
               <div>
-                <Text size="2" weight="medium">Imported</Text>
-                <ScrollArea style={{ maxHeight: '200px' }} className="mt-2">
-                  {result.imported.map((t: any, i: number) => {
-                    const details = [
-                      (t.artists || []).join(', '),
-                      t.album || null,
-                      t.year_released ? String(t.year_released) : null,
-                      t.bpm ? `${t.bpm} BPM` : null,
-                    ].filter(Boolean).join(' · ')
-                    return (
-                      <div key={i} className="py-2 border-b border-border last:border-none">
-                        <Text weight="medium" className="block">{t.title}</Text>
-                        {details && <Text size="1" color="gray" className="block mt-1">{details}</Text>}
-                      </div>
-                    )
-                  })}
+                <Text size="2" weight="medium">Still missing from Harmoniq</Text>
+                <ScrollArea style={{ maxHeight: '160px' }} className="mt-2">
+                  {result.unmatched.map((item, i) => (
+                    <div key={i} className="py-2 border-b border-border last:border-none">
+                      <Text weight="medium" className="block">{item.title}</Text>
+                      <a href="/songs/add" className="mt-1 inline-block text-xs text-primary no-underline hover:underline">
+                        Suggest this song for the database
+                      </a>
+                    </div>
+                  ))}
                 </ScrollArea>
               </div>
             )}
 
-            {/* Skipped */}
             {result.skipped && result.skipped.length > 0 && (
               <div>
                 <Text size="2" weight="medium">Skipped / Issues</Text>
@@ -363,50 +381,87 @@ export default function ImportPlaylistModal({ isOpen, onClose, onImported }: Imp
               ) : preview ? (
                 <div className="space-y-3">
                   <div className="p-3 rounded-lg border border-border bg-card/30">
-                    <Text weight="medium">Found (already linked)</Text>
-                    {preview.found && preview.found.length > 0 ? (
+                    <Text weight="medium">Exact linked songs</Text>
+                    {preview.items.filter((item) => item.matchState === 'linked').length > 0 ? (
                       <ScrollArea style={{ maxHeight: 120 }} className="mt-2">
-                        {preview.found.map((f: any, i: number) => (
-                          <div key={i} className="py-2 border-b border-border last:border-none">
-                            <Text weight="medium" className="block">{f.title}</Text>
-                            {f.songId && <Text size="1" color="gray" className="block mt-1">Already linked</Text>}
+                        {preview.items.filter((item) => item.matchState === 'linked').map((item) => (
+                          <div key={item.trackId} className="py-2 border-b border-border last:border-none">
+                            <Text weight="medium" className="block">{item.title}</Text>
+                            <Text size="1" color="gray" className="block mt-1">Already linked to an existing song in Harmoniq</Text>
                           </div>
                         ))}
                       </ScrollArea>
                     ) : (
-                      <Text size="1" color="gray" mt="2">No existing matches</Text>
+                      <Text size="1" color="gray" mt="2">No exact linked songs</Text>
                     )}
                   </div>
 
                   <div className="p-3 rounded-lg border border-border bg-card/30">
-                    <Text weight="medium">To be imported</Text>
-                    {preview.imported && preview.imported.length > 0 ? (
-                      <ScrollArea style={{ maxHeight: 160 }} className="mt-2">
-                        {preview.imported.map((t: any, i: number) => {
-                          const details = [
-                            (t.artists || []).join(', '),
-                            t.album || null,
-                            t.year_released ? String(t.year_released) : null,
-                            t.bpm ? `${t.bpm} BPM` : null,
-                          ].filter(Boolean).join(' · ')
-                          return (
-                            <div key={i} className="py-2 border-b border-border last:border-none">
-                              <Text weight="medium" className="block">{t.title}</Text>
-                              {details && <Text size="1" color="gray" className="block mt-1">{details}</Text>}
+                    <Text weight="medium">Confident community matches</Text>
+                    {preview.items.filter((item) => item.matchState === 'match_available').length > 0 ? (
+                      <ScrollArea style={{ maxHeight: 240 }} className="mt-2">
+                        {preview.items.filter((item) => item.matchState === 'match_available').map((item) => (
+                          <div key={item.trackId} className="py-3 border-b border-border last:border-none space-y-2">
+                            <div>
+                              <Text weight="medium" className="block">{item.title}</Text>
+                              <Text size="1" color="gray" className="block mt-1">
+                                {item.artists.join(', ') || 'Unknown artist'}
+                                {item.album ? ` • ${item.album}` : ''}
+                              </Text>
                             </div>
-                          )
-                        })}
+                            <div className="space-y-2">
+                              {item.candidates.map((candidate) => (
+                                <button
+                                  key={`${item.trackId}-${candidate.songId}`}
+                                  type="button"
+                                  onClick={() => setSelectedMatches((current) => ({ ...current, [item.trackId]: candidate.songId }))}
+                                  className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${selectedMatches[item.trackId] === candidate.songId ? 'border-primary bg-primary/10' : 'border-border/70 bg-background/70 hover:bg-background'}`}
+                                >
+                                  <Text weight="medium" className="block">{candidate.title}</Text>
+                                  <Text size="1" color="gray" className="block mt-1">
+                                    {candidate.artistNames.join(', ') || 'Unknown artist'}
+                                    {candidate.albumName ? ` • ${candidate.albumName}` : ''}
+                                    {` • ${Math.round(candidate.confidence * 100)}% confidence`}
+                                  </Text>
+                                  <Text size="1" color="gray" className="block mt-1">{candidate.reasons.join(' • ')}</Text>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </ScrollArea>
                     ) : (
-                      <Text size="1" color="gray" mt="2">No new songs to import</Text>
+                      <Text size="1" color="gray" mt="2">No confident matches need confirmation</Text>
                     )}
                   </div>
 
-                  {preview.skipped && preview.skipped.length > 0 && (
+                  <div className="p-3 rounded-lg border border-border bg-card/30">
+                    <Text weight="medium">No match yet</Text>
+                    {preview.items.filter((item) => item.matchState === 'no_match').length > 0 ? (
+                      <ScrollArea style={{ maxHeight: 160 }} className="mt-2">
+                        {preview.items.filter((item) => item.matchState === 'no_match').map((item) => (
+                          <div key={item.trackId} className="py-2 border-b border-border last:border-none">
+                            <Text weight="medium" className="block">{item.title}</Text>
+                            <Text size="1" color="gray" className="block mt-1">
+                              {item.artists.join(', ') || 'Unknown artist'}
+                              {item.album ? ` • ${item.album}` : ''}
+                            </Text>
+                            <a href="/songs/add" className="mt-1 inline-block text-xs text-primary no-underline hover:underline">
+                              Suggest this song for Harmoniq
+                            </a>
+                          </div>
+                        ))}
+                      </ScrollArea>
+                    ) : (
+                      <Text size="1" color="gray" mt="2">Every track has either an exact link or a confident candidate.</Text>
+                    )}
+                  </div>
+
+                  {preview.skipped.length > 0 && (
                     <div className="p-3 rounded-lg border border-border bg-card/30">
                       <Text weight="medium">Skipped / Issues</Text>
                       <ScrollArea style={{ maxHeight: 120 }} className="mt-2">
-                        {preview.skipped.map((s: any, i: number) => (
+                        {preview.skipped.map((s, i) => (
                           <div key={i} className="py-2 border-b border-border last:border-none">
                             <Text weight="medium" className="block">{s.title}</Text>
                             {s.reason && <Text size="1" color="gray" className="block mt-1">{s.reason}</Text>}

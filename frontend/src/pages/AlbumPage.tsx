@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Box, Button, Card, Flex, Heading, Text } from '@radix-ui/themes'
+import { PencilLine, Clock, Headphones, Heart } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import AddToPlaylistModal from '../features/playlists/components/AddToPlaylistModal'
 import { useAuth } from '../context/AuthContext'
+import LinkSpotifyEntityProposalModal from '../features/proposals/components/ArtistProposalModal'
 
 interface Artist { id: string; name: string }
 interface Album {
   id: string
   name: string
+  spotify_id?: string | null
   created_at?: string
   album_artists?: Array<{ artists?: Artist }>
 }
@@ -33,8 +36,14 @@ export default function AlbumPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [albumPlaylistOpen, setAlbumPlaylistOpen] = useState(false)
+  const [spotifyProposalOpen, setSpotifyProposalOpen] = useState(false)
   const [albumLoading, setAlbumLoading] = useState<'listento' | 'listened' | null>(null)
   const [albumSuccess, setAlbumSuccess] = useState<'listento' | 'listened' | null>(null)
+  const [songActions, setSongAction] = useState<Record<string, {
+    listened: boolean
+    listento: boolean
+    liked: boolean
+  }>>({})
 
   useEffect(() => {
     if (!albumId) return
@@ -43,7 +52,7 @@ export default function AlbumPage() {
       try {
         const { data: albumData, error: albumErr } = await supabase
           .from('albums')
-          .select('id, name, created_at, album_artists ( artists ( id, name ) )')
+          .select('id, name, spotify_id, created_at, album_artists ( artists ( id, name ) )')
           .eq('id', albumId)
           .single()
 
@@ -64,6 +73,31 @@ export default function AlbumPage() {
           return
         }
         setSongs(songsData ?? [])
+        if (user && songsData) {
+          const statusEntries = await Promise.all(
+            songsData.map(async song => {
+              const res = await fetch(`/api/songs/${song.id}/status`, {
+                headers: { 'x-user-id': user.id }
+              })
+
+              if (!res.ok) {
+                return [song.id, { listened: false, listento: false, liked: false }]
+              }
+
+              const data = await res.json()
+
+              return [
+                song.id,
+                {
+                  listened: data.listened ?? false,
+                  listento: data.listento ?? false,
+                  liked: data.liked ?? false
+                }
+              ]
+            })
+          )
+          setSongAction(Object.fromEntries(statusEntries))
+        }
       } catch (err) {
         console.error(err)
         setError('Failed to fetch album')
@@ -71,7 +105,72 @@ export default function AlbumPage() {
         setLoading(false)
       }
     })()
-  }, [albumId])
+  }, [albumId, user])
+
+  async function songAction(
+    e: React.MouseEvent,
+    songId: string,
+    action: 'listento' | 'listened' | 'like'
+  ) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const userId = user?.id
+    if (!userId) {
+      alert('You must be logged in')
+      return
+    }
+
+    const current = songActions[songId] ?? {
+      listened: false,
+      listento: false,
+      liked: false
+    }
+
+    const key = action === 'like' ? 'liked' : action
+    const wasActive = current[key]
+    const optimistic = !wasActive
+
+    setSongAction(prev => ({
+      ...prev,
+      [songId]: {
+        ...current,
+        [key]: optimistic
+      }
+  }))
+
+  try {
+    const method = optimistic ? 'POST' : 'DELETE'
+    const url =
+      action === 'like'
+        ? `/api/likes/${songId}`
+        : `/api/songs/${songId}/${action}`
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'x-user-id': userId }
+    })
+
+    if (!res.ok) {
+      setSongAction(prev => ({
+        ...prev,
+        [songId]: {
+          ...current,
+          [key]: wasActive
+        }
+      }))
+    }
+  } catch (err) {
+    setSongAction(prev => ({
+      ...prev,
+      [songId]: {
+        ...current,
+        [key]: wasActive
+      }
+    }))
+    console.error(err)
+  }
+}
 
   const handleAddAlbum = async (target: 'listento' | 'listened') => {
     if (!user || !albumId) return
@@ -98,7 +197,7 @@ export default function AlbumPage() {
   if (error) return <div className="min-h-screen flex flex-col"><Navbar /><main className="p-6 text-center text-destructive">{error}</main><Footer /></div>
   if (!album) return <div className="min-h-screen flex flex-col"><Navbar /><main className="p-6 text-center text-destructive">Album not found</main><Footer /></div>
 
-  const albumArtists = album.album_artists?.map(a => a.artists?.name).filter(Boolean) as string[] | undefined
+  const albumArtists = album.album_artists?.map((entry) => entry.artists).filter(Boolean) as Artist[] | undefined
 
   return (
     <Box className="min-h-screen flex flex-col">
@@ -107,20 +206,43 @@ export default function AlbumPage() {
         <Box mb="5">
           <Flex justify="between" align="start">
             <div>
-              <Heading size="7" mb="1">{album.name}</Heading>
+              <Flex align="center" gap="2" mb="1">
+                <Heading size="7">{album.name}</Heading>
+                {user && (
+                  <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background/70 p-1 shadow-sm">
+                    <Button
+                      size="1"
+                      variant="ghost"
+                      color="gray"
+                      onClick={() => setSpotifyProposalOpen(true)}
+                      title="Suggest an edit"
+                      aria-label="Suggest an edit"
+                      className="rounded-full"
+                    >
+                      <PencilLine className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </Flex>
               {albumArtists && albumArtists.length > 0 && (
-                <Link to={`/search?artist=${encodeURIComponent(albumArtists[0])}`} className="no-underline">
-                  <Text size="2" color="gray" className="hover:underline">by {albumArtists.join(', ')}</Text>
-                </Link>
+                <Flex gap="2" wrap="wrap" mt="1">
+                  {albumArtists.map((artist) => (
+                    <Link key={artist.id} to={`/artists/${artist.id}`} className="no-underline">
+                      <Text size="2" color="gray" className="hover:underline">{artist.name}</Text>
+                    </Link>
+                  ))}
+                </Flex>
               )}
               <Text size="2" color="gray" as="p" mt="1">{songs.length} {songs.length === 1 ? 'song' : 'songs'}</Text>
             </div>
             <div>
-              <div className="flex gap-3">
-                <Button variant={albumSuccess === 'listento' ? 'solid' : 'outline'} onClick={() => handleAddAlbum('listento')} disabled={albumLoading !== null}>{albumLoading === 'listento' ? 'Adding...' : albumSuccess === 'listento' ? 'Album Added' : '+ Add to Listen To'}</Button>
-                <Button variant={albumSuccess === 'listened' ? 'solid' : 'outline'} onClick={() => handleAddAlbum('listened')} disabled={albumLoading !== null}>{albumLoading === 'listened' ? 'Adding...' : albumSuccess === 'listened' ? 'Album Added' : '+ Mark Album as Listened'}</Button>
-                <Button variant="outline" color="orange" onClick={() => setAlbumPlaylistOpen(true)}>+ Album to Playlist</Button>
-              </div>
+              {user && (
+                <div className="flex gap-3">
+                  <Button variant={albumSuccess === 'listento' ? 'solid' : 'outline'} onClick={() => handleAddAlbum('listento')} disabled={albumLoading !== null}>{albumLoading === 'listento' ? 'Adding...' : albumSuccess === 'listento' ? 'Album Added' : '+ Add to Listen To'}</Button>
+                  <Button variant={albumSuccess === 'listened' ? 'solid' : 'outline'} onClick={() => handleAddAlbum('listened')} disabled={albumLoading !== null}>{albumLoading === 'listened' ? 'Adding...' : albumSuccess === 'listened' ? 'Album Added' : '+ Mark Album as Listened'}</Button>
+                  <Button variant="outline" color="orange" onClick={() => setAlbumPlaylistOpen(true)}>+ Album to Playlist</Button>
+                </div>
+              )}
             </div>
           </Flex>
         </Box>
@@ -132,6 +254,13 @@ export default function AlbumPage() {
             {songs.map((s, idx) => {
               const artists = s.song_artists?.map(sa => sa?.artists?.name).filter(Boolean)
               const artistStr = artists && artists.length ? artists.join(', ') : undefined
+
+              const status = songActions[s.id] ?? {
+                listened: false,
+                listento: false,
+                liked: false,
+              }
+
               return (
                 <div key={s.id}>
                   <Link to={`/songs/${s.id}`} className="flex items-center gap-4 p-4 rounded-lg transition-colors hover-bg-gray no-underline">
@@ -143,6 +272,36 @@ export default function AlbumPage() {
                         {s.genre} {s.year_released ? `• ${s.year_released}` : ''} {s.bpm ? `• ${s.bpm} BPM` : ''}
                       </Text>
                     </div>
+                    {user && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="1"
+                          variant={status.listento ? 'solid' : 'ghost'}
+                          color={status.listento ? 'green' : 'gray'}
+                          onClick={(e) => songAction(e, s.id, 'listento')}
+                        >
+                          <Clock className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          size="1"
+                          variant={status.listened ? 'solid' : 'ghost'}
+                          color={status.listened ? 'green' : 'gray'}
+                          onClick={(e) => songAction(e, s.id, 'listened')}
+                        >
+                          <Headphones className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          size="1"
+                          variant={status.liked ? 'solid' : 'ghost'}
+                          color={status.liked ? 'red' : 'gray'}
+                          onClick={(e) => songAction(e, s.id, 'like')}
+                        >
+                          <Heart className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
                   </Link>
                 </div>
               )
@@ -151,6 +310,16 @@ export default function AlbumPage() {
         )}
 
         <AddToPlaylistModal isOpen={albumPlaylistOpen} onClose={() => setAlbumPlaylistOpen(false)} albumId={album.id} />
+        <LinkSpotifyEntityProposalModal
+          open={spotifyProposalOpen}
+          onOpenChange={setSpotifyProposalOpen}
+          currentUserId={user?.id ?? null}
+          entityType="album"
+          entityId={album.id}
+          entityName={album.name}
+          currentSpotifyId={album.spotify_id ?? null}
+          currentArtists={albumArtists?.map((artist) => ({ id: artist.id, name: artist.name })) ?? []}
+        />
       </Box>
       <Footer />
     </Box>
