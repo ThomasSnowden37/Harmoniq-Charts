@@ -28,7 +28,7 @@ router.get('/song/:songId', async (req, res) => {
 
   const { data, error } = await supabase
     .from('reviews')
-    .select('id, content, created_at, user_id, users(username, picture_url)')
+    .select('id, content, created_at, user_id, users(username, picture_url), review_likes(user_id)')
     .eq('song_id', songId)
     .order('created_at', { ascending: false })
 
@@ -151,5 +151,45 @@ router.delete('/:reviewId', async (req, res) => {
   const { data: trend, error: trend_error } = await supabase.rpc('get_trending_songs');
   res.json({ message: 'Review deleted' })
 })
+
+/**
+ * POST /api/reviews/:reviewId/like
+ * Like a review
+ */
+router.post('/:reviewId/like', async (req, res) => {
+  const userId = req.headers['x-user-id'] as string;
+  const { reviewId } = req.params;
+
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { error } = await supabase
+    .from('review_likes')
+    .insert({ user_id: userId, review_id: reviewId });
+
+  // 23505 is the PostgreSQL error code for a unique constraint violation (they already liked it)
+  if (error && error.code !== '23505') return res.status(500).json({ error: error.message });
+  
+  res.json({ success: true });
+});
+
+/**
+ * DELETE /api/reviews/:reviewId/like
+ * Unlike a review
+ */
+router.delete('/:reviewId/like', async (req, res) => {
+  const userId = req.headers['x-user-id'] as string;
+  const { reviewId } = req.params;
+
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { error } = await supabase
+    .from('review_likes')
+    .delete()
+    .match({ user_id: userId, review_id: reviewId });
+
+  if (error) return res.status(500).json({ error: error.message });
+  
+  res.json({ success: true });
+});
 
 export default router

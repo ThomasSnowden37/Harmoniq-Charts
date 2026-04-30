@@ -173,7 +173,7 @@ export default function SongPage() {
     const [listento, setListento] = useState(false)
     const [liked, setLiked] = useState(false)
     const [likeCount, setLikeCount] = useState(0)
-    const [reviews, setReviews] = useState<{ id: string; content: string; created_at: string; user_id: string; users: { username: string; picture_url?: string } }[]>([])
+    const [reviews, setReviews] = useState<{id: string; content: string; created_at: string; user_id: string; users: { username: string; picture_url?: string }; review_likes?: { user_id: string }[];}[]>([])
     const [reviewText, setReviewText] = useState('')
     const [reviewError, setReviewError] = useState<string | null>(null)
     const [submittingReview, setSubmittingReview] = useState(false)
@@ -659,6 +659,53 @@ useEffect(() => {
                       <span className="text-xs text-muted-foreground">
                         {new Date(review.created_at).toLocaleDateString()}
                       </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className={`flex items-center gap-1.5 text-xs transition-colors ${
+                          review.review_likes?.some((like) => like.user_id === user?.id)
+                            ? 'text-destructive'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                        onClick={async () => {
+                          if (!user) {
+                            alert('You must be logged in to like a review');
+                            return;
+                          }
+
+                          const hasLiked = review.review_likes?.some((like) => like.user_id === user.id);
+                          const optimisticLiked = !hasLiked;
+
+                          setReviews((prev) =>
+                            prev.map((r) => {
+                              if (r.id === review.id) {
+                                const newLikes = optimisticLiked
+                                  ? [...(r.review_likes || []), { user_id: user.id }]
+                                  : (r.review_likes || []).filter((like) => like.user_id !== user.id);
+                                return { ...r, review_likes: newLikes };
+                              }
+                              return r;
+                            })
+                          );
+
+                          try {
+                            const method = optimisticLiked ? 'POST' : 'DELETE';
+                            const res = await fetch(`/api/reviews/${review.id}/like`, {
+                              method,
+                              headers: { 'x-user-id': user.id },
+                            });
+
+                            if (!res.ok) console.error('Failed to toggle review like');
+                          } catch (err) {
+                            console.error(err);
+                          }
+                        }}
+                      >
+                        <Heart 
+                          className={`w-4 h-4 ${review.review_likes?.some((like) => like.user_id === user?.id) ? 'fill-current' : ''}`} 
+                        />
+                        <span className="font-medium">{review.review_likes?.length || 0}</span>
+                      </button>
+                    </div>
                       {(user?.id === review.user_id) && (
                         <button
                             className="text-xs text-primary hover:underline cursor-pointer"
