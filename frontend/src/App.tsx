@@ -28,6 +28,7 @@ function App() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/usersearch" element={<UserSearchPage />} />
         <Route path="/recommend" element={<RecommendPage />} />
+        <Route path="/recommendresult/" element={<RecommendResult />} />
         <Route path="/recommend/:id" element={<RecommendResult />} />
         <Route path="/playlists/:playlistId" element={<PlaylistPage />} />
         <Route path="/albums/:albumId" element={<AlbumPage />} />
