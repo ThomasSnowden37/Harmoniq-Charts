@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Search, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@radix-ui/themes';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
@@ -8,20 +8,41 @@ import { useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer'
 
-interface Song {
-    id: string
-    title: string
-    bpm: number
-    genre: string
-    album: string
-  credits: string
-    artist: string
-    rating: number | null
+type SongCredit = {
+  role?: string | null
+  artists?: { name?: string | null } | Array<{ name?: string | null }> | null
 }
+
+interface Song {
+  id: string
+  title: string
+  bpm: number
+  genre: string
+  album: string
+  credits: string
+  artist: string
+  rating: number | null
+}
+
+const getCreditNames = (song: { song_credits?: SongCredit[] } | null | undefined) =>
+  song?.song_credits
+    ?.map((credit) => {
+      const artist = Array.isArray(credit.artists) ? credit.artists[0] : credit.artists;
+      return artist?.name?.trim() ?? '';
+    })
+    .filter(Boolean)
+    .join(', ') ?? '';
+
+const normalizeCreditList = (value: string) =>
+  value
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean)
+    .sort()
+    .join(', ');
 
 
 export default function RecommendResult() {
-  const [query, setQuery] = useState('');
   const [songs, setSongs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [targetSong, setTargetSong] = useState<Song | null>(null)
@@ -36,16 +57,14 @@ export default function RecommendResult() {
   const [ratingLikeness, setRatingLikeness] = useState(false);
   const [exactLikeness, setExactLikeness] = useState(false);
   const [userVotes, setUserVotes] = useState<Record<string, 'up' | 'down' | null>>({});
-  const [loadingSong, setLoadingSong] = useState(false);
-  const [loadingRecs, setLoadingRecs] = useState(false);
   
   const [overrides, setOverrides] = useState({
-  artist: '',
-  album: '',
-  songwriter: '',
-  bpm: '',
-  genre: '',
-  rating: ''
+    artist: '',
+    album: '',
+    credits: '',
+    bpm: '',
+    genre: '',
+    rating: ''
   });
   const getValue = (field: keyof typeof overrides, fallback: any) => {
     const value = overrides[field];
@@ -68,6 +87,10 @@ export default function RecommendResult() {
           albums!inner (*),
           song_artists!inner (
             artists!inner (*)
+          ),
+          song_credits (
+            role,
+            artists (*)
           ),
           ratings!left (rating),
           song_feedback_summary (
@@ -95,18 +118,6 @@ export default function RecommendResult() {
           queryBuilder = queryBuilder.ilike('albums.name', `%${albumValue}%`);
         } else {
           queryBuilder = queryBuilder.is('albums.id', null);
-        }
-      }
-
-      const songwriterValue = getValue('songwriter', targetSong?.song_writer);
-      if (songwriterLikeness && songwriterValue) {
-        if (exactLikeness) {
-          queryBuilder = queryBuilder.eq('songwriter', songwriterValue);
-        } else {
-          const writers = songwriterValue.split(',').map((w: string) => w.trim());
-          queryBuilder = queryBuilder.or(
-            writers.map((w: string) => `songwriter.ilike.%${w}%`).join(',')
-          );
         }
       }
 
@@ -144,11 +155,28 @@ export default function RecommendResult() {
 
       let results = data.map((song: any) => ({
         ...song,
+        credits: getCreditNames(song),
         helpful_count: song.song_feedback_summary?.[0]?.helpful_count ?? 0,
         unhelpful_count: song.song_feedback_summary?.[0]?.unhelpful_count ?? 0,
       }));
 
       if (!error && data) {
+        const creditValue = getValue('credits', targetSong?.credits);
+        if (creditLikeness && creditValue) {
+          const normalizedCreditValue = normalizeCreditList(creditValue);
+          const creditTerms = normalizedCreditValue.split(', ').filter(Boolean);
+
+          results = results.filter((song) => {
+            if (!song.credits) return false;
+
+            if (exactLikeness) {
+              return normalizeCreditList(song.credits) === normalizedCreditValue;
+            }
+
+            const normalizedSongCredits = song.credits.toLowerCase();
+            return creditTerms.some((credit) => normalizedSongCredits.includes(credit));
+          });
+        }
 
         const rawRating = getValue('rating', targetSong?.rating);
         const ratingValue = rawRating === '' ? null : Number(rawRating);  
@@ -231,7 +259,7 @@ export default function RecommendResult() {
     const filterMap: Record<string, boolean> = {
       artist: artistLikeness,
       album: albumLikeness,
-      songwriter: songwriterLikeness,
+      credits: creditLikeness,
       bpm: bpmLikeness,
       genre: genreLikeness,
       rating: ratingLikeness
@@ -251,7 +279,7 @@ export default function RecommendResult() {
       const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
       onSubmit(fakeEvent);
       
-    }, [artistLikeness, albumLikeness, bpmLikeness, songwriterLikeness, genreLikeness, ratingLikeness, targetSong, overrides, exactLikeness]);
+    }, [artistLikeness, albumLikeness, creditLikeness, bpmLikeness, genreLikeness, ratingLikeness, targetSong, overrides, exactLikeness]);
 
     useEffect(() => {
       if (!id) return;
@@ -265,6 +293,10 @@ export default function RecommendResult() {
               *,
               albums!inner (*),
               song_artists (
+                artists (*)
+              ),
+              song_credits (
+                role,
                 artists (*)
               ),
               ratings!left (rating),
@@ -289,7 +321,7 @@ export default function RecommendResult() {
               bpm: data.bpm,
               genre: data.genre,
               album: data.albums?.name ?? 'Single',
-              song_writer: data.songwriter ?? '',
+              credits: getCreditNames(data),
               artist: data.song_artists?.map((sa: any) => sa.artists.name).join(', ') ?? '',
               rating: getAvgRating(data.ratings)
             });
@@ -306,8 +338,6 @@ export default function RecommendResult() {
     }, [id]);
 
     const handleVote = async (songId: string, type: 'up' | 'down') => {
-    const session = await supabase.auth.getUser();
-    
       if (!user) return;
       const userid = (user != null) ? user.id : null;
 
@@ -335,7 +365,6 @@ export default function RecommendResult() {
       );
 
       let result;
-
       if (newVote === null) {
         result = await supabase
           .from('recommendation_feedback')
@@ -415,10 +444,10 @@ export default function RecommendResult() {
             />
 
             <input
-              placeholder="Songwriter override"
-              value={overrides.songwriter}
+              placeholder="Credits override"
+              value={overrides.credits}
               onChange={(e) =>
-                setOverrides({ ...overrides, songwriter: e.target.value })
+                setOverrides({ ...overrides, credits: e.target.value })
               }
             />
 
@@ -451,7 +480,7 @@ export default function RecommendResult() {
                 onClick={() => setOverrides({
                   artist: '',
                   album: '',
-                  songwriter: '',
+                  credits: '',
                   bpm: '',
                   genre: '',
                   rating: ''
@@ -528,8 +557,8 @@ export default function RecommendResult() {
           <div className="mt-8">
             {loading && <p className="text-muted-foreground">Loading...</p>}
 
-            {!loading && songs.length === 0 && query && (
-              <p className="text-muted-foreground">No results found for "{query}" </p>
+            {!loading && songs.length === 0 && targetSong && (
+              <p className="text-muted-foreground">No recommendations matched the selected filters.</p>
             )}
 
             {!loading && songs.length > 0 && (
@@ -556,7 +585,7 @@ export default function RecommendResult() {
                                     </span>
                                   ))}
                                   </div>
-                                <div className="flex-1 min-w-[200px]">Songwriter(s): {renderBold(song.songwriter, "songwriter")} </div>
+                                <div className="flex-1 min-w-[200px]">Credits: {renderBold(song.credits || 'No credits listed', "credits")} </div>
                                 <div className="flex-1 min-w-[120px]">Album: {renderBold(song.albums?.name ?? "Single", "album")} </div>
                             </div>      
 
