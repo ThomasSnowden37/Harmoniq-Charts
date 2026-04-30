@@ -45,7 +45,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I add a song to Harmoniq?',
         answer:
-          'Click "Add Song" in the navbar, fill in the song details (title, artist, album, year, genre, BPM), and submit. Songs you add are visible to the whole community.',
+          'Click "Contribution" in the navbar, click "Suggest a Song", fill in the song details, and submit your suggestion. New songs enter the contribution queue first, so they only go live after the community reviews and approves the proposal.',
       },
       {
         question: 'How do I rate or review a song?',
@@ -61,6 +61,36 @@ const FAQ_DATA: FAQCategory[] = [
         question: 'Can I import my Spotify playlists?',
         answer:
           'Yes! On your profile page you can connect your Spotify account and import your existing playlists directly into Harmoniq.',
+      },
+    ],
+  },
+  {
+    title: 'Contribution System',
+    items: [
+      {
+        question: 'How does the contribution system work?',
+        answer:
+          'User-submitted song additions and song edits are turned into proposals for the community to review. Reviewers compare the proposed details against the current record, then vote to approve or reject the change before anything is published live.',
+      },
+      {
+        question: 'What happens if my song suggestion looks like a duplicate?',
+        answer:
+          'Harmoniq checks for possible duplicate matches before a new song proposal is submitted. If similar songs are found, you can review those matches first and only continue if your entry is genuinely different.',
+      },
+      {
+        question: 'How do reviews and votes work?',
+        answer:
+          'The Contributions page serves proposals one at a time so reviewers can focus on each change. You can approve a proposal, reject it with a reason, or skip it if you are not confident enough to vote.',
+      },
+      {
+        question: 'Can I report a suspicious or low-quality proposal?',
+        answer:
+          'Yes. Proposals can be reported when something looks off, which helps surface problematic submissions for moderation and keeps the queue cleaner for everyone else.',
+      },
+      {
+        question: 'Can I track my own contributions?',
+        answer:
+          'Yes. Your submitted proposals appear in your contributions history, and your contribution reputation is shown alongside them. That reputation affects voting weight, but every proposal still goes through the same review flow.',
       },
     ],
   },
