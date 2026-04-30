@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Box, Button, Card, Flex, Heading, Text } from '@radix-ui/themes'
-import { PencilLine } from 'lucide-react'
+import { PencilLine, Clock, Headphones, Heart } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -39,6 +39,11 @@ export default function AlbumPage() {
   const [spotifyProposalOpen, setSpotifyProposalOpen] = useState(false)
   const [albumLoading, setAlbumLoading] = useState<'listento' | 'listened' | null>(null)
   const [albumSuccess, setAlbumSuccess] = useState<'listento' | 'listened' | null>(null)
+  const [songActions, setSongAction] = useState<Record<string, {
+    listened: boolean
+    listento: boolean
+    liked: boolean
+  }>>({})
 
   useEffect(() => {
     if (!albumId) return
@@ -68,6 +73,31 @@ export default function AlbumPage() {
           return
         }
         setSongs(songsData ?? [])
+        if (user && songsData) {
+          const statusEntries = await Promise.all(
+            songsData.map(async song => {
+              const res = await fetch(`/api/songs/${song.id}/status`, {
+                headers: { 'x-user-id': user.id }
+              })
+
+              if (!res.ok) {
+                return [song.id, { listened: false, listento: false, liked: false }]
+              }
+
+              const data = await res.json()
+
+              return [
+                song.id,
+                {
+                  listened: data.listened ?? false,
+                  listento: data.listento ?? false,
+                  liked: data.liked ?? false
+                }
+              ]
+            })
+          )
+          setSongAction(Object.fromEntries(statusEntries))
+        }
       } catch (err) {
         console.error(err)
         setError('Failed to fetch album')
@@ -75,7 +105,72 @@ export default function AlbumPage() {
         setLoading(false)
       }
     })()
-  }, [albumId])
+  }, [albumId, user])
+
+  async function songAction(
+    e: React.MouseEvent,
+    songId: string,
+    action: 'listento' | 'listened' | 'like'
+  ) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const userId = user?.id
+    if (!userId) {
+      alert('You must be logged in')
+      return
+    }
+
+    const current = songActions[songId] ?? {
+      listened: false,
+      listento: false,
+      liked: false
+    }
+
+    const key = action === 'like' ? 'liked' : action
+    const wasActive = current[key]
+    const optimistic = !wasActive
+
+    setSongAction(prev => ({
+      ...prev,
+      [songId]: {
+        ...current,
+        [key]: optimistic
+      }
+  }))
+
+  try {
+    const method = optimistic ? 'POST' : 'DELETE'
+    const url =
+      action === 'like'
+        ? `/api/likes/${songId}`
+        : `/api/songs/${songId}/${action}`
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'x-user-id': userId }
+    })
+
+    if (!res.ok) {
+      setSongAction(prev => ({
+        ...prev,
+        [songId]: {
+          ...current,
+          [key]: wasActive
+        }
+      }))
+    }
+  } catch (err) {
+    setSongAction(prev => ({
+      ...prev,
+      [songId]: {
+        ...current,
+        [key]: wasActive
+      }
+    }))
+    console.error(err)
+  }
+}
 
   const handleAddAlbum = async (target: 'listento' | 'listened') => {
     if (!user || !albumId) return
@@ -157,6 +252,13 @@ export default function AlbumPage() {
             {songs.map((s, idx) => {
               const artists = s.song_artists?.map(sa => sa?.artists?.name).filter(Boolean)
               const artistStr = artists && artists.length ? artists.join(', ') : undefined
+
+              const status = songActions[s.id] ?? {
+                listened: false,
+                listento: false,
+                liked: false,
+              }
+
               return (
                 <div key={s.id}>
                   <Link to={`/songs/${s.id}`} className="flex items-center gap-4 p-4 rounded-lg transition-colors hover-bg-gray no-underline">
@@ -168,6 +270,36 @@ export default function AlbumPage() {
                         {s.genre} {s.year_released ? `• ${s.year_released}` : ''} {s.bpm ? `• ${s.bpm} BPM` : ''}
                       </Text>
                     </div>
+                    {user && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="1"
+                          variant={status.listento ? 'solid' : 'ghost'}
+                          color={status.listento ? 'green' : 'gray'}
+                          onClick={(e) => songAction(e, s.id, 'listento')}
+                        >
+                          <Clock className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          size="1"
+                          variant={status.listened ? 'solid' : 'ghost'}
+                          color={status.listened ? 'green' : 'gray'}
+                          onClick={(e) => songAction(e, s.id, 'listened')}
+                        >
+                          <Headphones className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          size="1"
+                          variant={status.liked ? 'solid' : 'ghost'}
+                          color={status.liked ? 'red' : 'gray'}
+                          onClick={(e) => songAction(e, s.id, 'like')}
+                        >
+                          <Heart className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
                   </Link>
                 </div>
               )
