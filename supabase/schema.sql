@@ -125,6 +125,7 @@ CREATE TABLE playlists (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     spotify_playlist_id VARCHAR(50)
     trending_score NUMERIC DEFAULT 0,
+    permanent BOOLEAN DEFAULT FALSE,
 );
 
 CREATE TABLE playlist_songs (

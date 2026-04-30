@@ -267,6 +267,7 @@ export interface Database {
           created_at: string
           spotify_playlist_id: string | null
           trending_score: number | null
+          permanent: boolean
         }
         Insert: {
           id?: string
@@ -276,6 +277,7 @@ export interface Database {
           created_at?: string
           spotify_playlist_id?: string | null
           trending_score: number | null
+          permanent: boolean
         }
         Update: {
           id?: string
@@ -285,6 +287,7 @@ export interface Database {
           created_at?: string
           spotify_playlist_id?: string | null
           trending_score: number | null
+          permanent: boolean
         }
       }
       playlist_songs: {

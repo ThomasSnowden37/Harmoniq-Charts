@@ -528,6 +528,35 @@ router.get('/:id/listened/count', async (req, res) => {
 })
 
 /**
+ * Function to get/create the users Listen Later Playlist
+ */
+async function ListenLaterHelper(userId: string) {
+    const { data: existing, error: eerror} = await supabase
+        .from('playlists')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('name', 'Listen Later')
+        .eq('permanent', true)
+        .maybeSingle()
+
+    if (eerror) throw eerror
+    if (existing) return existing.id
+
+    const { data: create, error: cerror} = await supabase
+        .from('playlists')
+        .insert({
+            user_id: userId,
+            name: 'Listen Later',
+            permanent: true,
+        })
+        .select('id')
+        .single()
+
+    if (cerror) throw cerror
+    if (create) return create.id
+}
+
+/**
  * Get aggregated engagement details for a song
  * Returns: { listenedCount, likeCount, average, count }
  */
@@ -585,6 +614,8 @@ router.get('/:id/status', async (req, res) => {
         return res.json({ listened: false, listento: false, liked: false, rating: null })
     }
 
+    const playLL = await ListenLaterHelper(userId)
+
     try {
         const [
             { data: listenedData },
@@ -593,7 +624,7 @@ router.get('/:id/status', async (req, res) => {
             { data: ratingData }
         ] = await Promise.all([
             supabase.from('listened').select('id').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
-            supabase.from('listento').select('id').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
+            supabase.from('playlist_songs').select('id').eq('song_id', songId).eq('playlist_id', playLL).maybeSingle(),
             supabase.from('likes').select('id').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
             supabase.from('ratings').select('rating').eq('song_id', songId).eq('user_id', userId).maybeSingle(),
         ])
@@ -628,18 +659,24 @@ router.get('/:id/listento', async (req, res) => {
         return res.status(404).json({ error: 'Song is not found' })
     }
 
-    const { data, error } = await supabase
-        .from('listento')
-        .select('id')
-        .eq('song_id', songId)
-        .eq('user_id', userId)
-        .single()
-    const listento = !!data
-    res.json({ listento })
+    try {
+        const playLL = await ListenLaterHelper(userId)
+
+        const { data } = await supabase
+            .from('playlist_songs')
+            .select('id')
+            .eq('playlist_id', playLL)
+            .eq('song_id', songId)
+            .maybeSingle()
+
+        res.json({ listento: !!data })
+    } catch (err: any) {
+        res.status(500).json({ error: err.message })
+    }
 })
 
 /**
- * Add a song to a users listen to
+ * Add a song to a users listen later
  */
 router.post('/:id/listento', async (req, res) => {
      const songId = req.params.id;
@@ -654,33 +691,37 @@ router.post('/:id/listento', async (req, res) => {
         .select('id')
         .eq('id', songId)
         .single()
+
     if (noSong) {
         return res.status(404).json({ error: 'Song is not found' })
     }
 
-    const { data: existing, error: errorExisting } = await supabase
-        .from('listento')
-        .select('id')
-        .eq('song_id', songId)
-        .eq('user_id', userId)
-        .single()
+    const userLL = await ListenLaterHelper(userId)
 
-    if (existing) {
-        return res.status(409).json({ error: 'Already listened' })
+    const { data: LLPlay} = await supabase
+        .from('playlist_songs')
+        .select('id')
+        .eq('playlist_id', userLL)
+        .eq('song_id', songId)
+        .maybeSingle()
+
+    if (LLPlay) {
+        return res.status(409).json({ error: 'Song already in Listen Later' })
     }
 
-    const {data, error} = await supabase
-        .from('listento')
+    const { data, error } = await supabase
+        .from('playlist_songs')
         .insert({
-            user_id: userId,
-            song_id: songId 
+            playlist_id: userLL,
+            song_id: songId
         })
         .select()
         .single()
 
-    if (error){
-        return res.status(500).json({ error: 'Failed to add song to listento'})
+    if (error) {
+        return res.status(409).json({ error: 'Failed to add to Listen Later' })
     }
+    
     return res.status(201).json(data)
 })
 
@@ -695,24 +736,18 @@ router.delete('/:id/listento', async (req, res) => {
         return res.status(400).json({ error: 'Song ID is required' })
     }
 
-    const { data: existSong, error: noSong } = await supabase 
-        .from('songs')
-        .select('id')
-        .eq('id', songId)
-        .single()
-    if (noSong) {
-        return res.status(404).json({ error: 'Song is not found' })
-    }
+    const userLL = await ListenLaterHelper(userId)
 
-    const { error } = await supabase
-        .from('listento')
+    const { error} = await supabase
+        .from('playlist_songs')
         .delete()
+        .eq('playlist_id', userLL)
         .eq('song_id', songId)
-        .eq('user_id', userId)
 
     if (error) {
-        return res.status(500).json({ error: 'Failed to remove listen to' })
+        return res.status(500).json({ error: 'Failed to delete from Listen Later' })
     }
+    
     res.json({ message: 'Successfully deleted' })
 })
 
@@ -739,23 +774,44 @@ router.post('/album/:albumId/bulk-add', async (req, res) => {
         if (!songs || songs.length === 0) {
             return res.status(404).json({ error: 'No songs found for this album' });
         }
+        if (targetTable === 'listened') {
+            const insertData = songs.map(song => ({
+                user_id: userId,
+                song_id: song.id
+            }));
 
-        const insertData = songs.map(song => ({
-            user_id: userId,
-            song_id: song.id
-        }));
+            const { data, error: insertError } = await supabase
+                .from(targetTable)
+                .upsert(insertData, { onConflict: 'user_id, song_id' })
+                .select();
 
-        const { data, error: insertError } = await supabase
-            .from(targetTable)
-            .upsert(insertData, { onConflict: 'user_id, song_id' })
-            .select();
+            if (insertError) throw insertError;
 
-        if (insertError) throw insertError;
+            return res.status(201).json({ 
+                message: `Successfully processed ${insertData.length} songs`,
+                count: data?.length 
+            });
+        }
+        if (targetTable === 'listento') {
+            const userLL = await ListenLaterHelper(userId)
 
-        return res.status(201).json({ 
-            message: `Successfully processed ${insertData.length} songs`,
-            count: data?.length 
-        });
+            const insertData = songs.map(song => ({
+                playlist_id: userLL,
+                song_id: song.id
+            }));
+
+            const { data, error: insertError } = await supabase
+                .from('playlist_songs')
+                .upsert(insertData, { onConflict: 'playlist_id,song_id' })
+                .select();
+            
+            if (insertError) throw insertError;
+
+            return res.status(201).json({ 
+                message: `Successfully added ${insertData.length} songs to Listen Later`,
+                count: data?.length 
+            });
+        }
     } catch (err: any) {
         console.error("Bulk Add Error:", err);
         return res.status(500).json({ error: err.message });
