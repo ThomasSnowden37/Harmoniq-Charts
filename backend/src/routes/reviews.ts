@@ -169,6 +169,12 @@ router.post('/:reviewId/like', async (req, res) => {
   // 23505 is the PostgreSQL error code for a unique constraint violation (they already liked it)
   if (error && error.code !== '23505') return res.status(500).json({ error: error.message });
   
+  const { error: trend_error } = await supabase.rpc('get_trending_reviews')
+
+  if (trend_error) {
+    return res.status(500).json({ error: trend_error.message })
+  }
+
   res.json({ success: true });
 });
 
@@ -189,6 +195,12 @@ router.delete('/:reviewId/like', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
   
+  const { error: trend_error } = await supabase.rpc('get_trending_reviews')
+
+  if (trend_error) {
+    return res.status(500).json({ error: trend_error.message })
+  }
+
   res.json({ success: true });
 });
 

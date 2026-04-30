@@ -90,6 +90,7 @@ CREATE TABLE reviews (
     song_id UUID REFERENCES songs(id) ON DELETE CASCADE NOT NULL,
     content TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    trending_score NUMERIC DEFAULT 0,
     UNIQUE(user_id, song_id) -- One review per user per song
 );
 
