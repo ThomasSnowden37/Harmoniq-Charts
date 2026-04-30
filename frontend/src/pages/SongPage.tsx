@@ -14,6 +14,7 @@ import { supabase } from '../lib/supabase'
 import {SpotifyIcon} from '../features/spotify/components/SpotifyConnectButton'
 import SongSuggestionModal from '../features/proposals/components/SongProposalModal'
 import MergeProposalModal from '../features/proposals/components/MergeSongsProposalModal'
+import { MOCK_CURRENT_USER_ID } from '@/lib/auth'
 
 /**
  * SongPage.tsx
@@ -152,6 +153,7 @@ function normalizeSongCredits(song: Song | null): NormalizedSongCredit[] {
 
 export default function SongPage() {
     const { user } = useAuth()
+    const currentUserId = user?.id ?? MOCK_CURRENT_USER_ID
     const { id } = useParams()
   const navigate = useNavigate()
     const [loading, setLoading] = useState(true)
@@ -176,6 +178,9 @@ export default function SongPage() {
     const [reviewError, setReviewError] = useState<string | null>(null)
     const [submittingReview, setSubmittingReview] = useState(false)
     const [userRating, setUserRating] = useState<number | null>(null)
+    const [editingReviewId, setEditingReviewId] = useState<string | null>(null)
+    const [editReviewText, setEditReviewText] = useState('')
+    const [editReviewError, setEditReviewError] = useState<string | null>(null)
     
 
     const MAX_CHARS = 100
@@ -654,6 +659,18 @@ useEffect(() => {
                       <span className="text-xs text-muted-foreground">
                         {new Date(review.created_at).toLocaleDateString()}
                       </span>
+                      {(user?.id === review.user_id) && (
+                        <button
+                            className="text-xs text-primary hover:underline cursor-pointer"
+                            onClick={() => {
+                              setEditingReviewId(review.id)
+                              setEditReviewText(review.content)
+                              setEditReviewError(null)
+                            }}
+                          >
+                            Edit
+                          </button>
+                      )}
                       {(user?.id === review.user_id || user?.isAdmin === true) && (
                         <button
                           className="text-xs text-destructive hover:underline cursor-pointer"
@@ -670,7 +687,58 @@ useEffect(() => {
                       )}
                     </div>
                   </div>
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{review.content}</p>
+                  {/* Toggle between Edit Mode and View Mode */}
+                  {editingReviewId === review.id ? (
+                    <div className="mt-2">
+                      <textarea
+                        value={editReviewText}
+                        onChange={(e) => { setEditReviewText(e.target.value); setEditReviewError(null); }}
+                        rows={3}
+                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary resize-none"
+                      />
+                      <div className="flex items-center justify-between mt-2">
+                        <span className={`text-xs ${editReviewText.length >= MAX_CHARS ? 'text-destructive' : 'text-muted-foreground'}`}>
+                          {editReviewText.length}/{MAX_CHARS}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          {editReviewError && <span className="text-xs text-destructive">{editReviewError}</span>}
+                          <Button size="1" variant="soft" color="gray" onClick={() => setEditingReviewId(null)}>Cancel</Button>
+                          <Button
+                            size="1"
+                            disabled={!editReviewText.trim() || editReviewText === review.content}
+                            onClick={async () => {
+                              if (editReviewText.trim().length > MAX_CHARS) {
+                                setEditReviewError(`Review cannot exceed ${MAX_CHARS} characters`);
+                                return;
+                              }
+                              try {
+                                const res = await fetch(`/api/reviews/${review.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json', 'x-user-id': currentUserId },
+                                  body: JSON.stringify({ content: editReviewText.trim() })
+                                });
+                                if (!res.ok) {
+                                  const data = await res.json();
+                                  setEditReviewError(data.error || 'Failed to update review');
+                                  return;
+                                }
+                                const updatedReview = await res.json();
+                                // Update the specific review in the UI state
+                                setReviews(prev => prev.map(r => r.id === review.id ? { ...r, content: updatedReview.content } : r));
+                                setEditingReviewId(null);
+                              } catch (err) {
+                                setEditReviewError('Failed to update review');
+                              }
+                            }}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{review.content}</p>
+                  )}
                 </div>
               ))}
             </div>

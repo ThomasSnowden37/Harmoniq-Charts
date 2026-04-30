@@ -89,6 +89,42 @@ router.post('/:songId', async (req, res) => {
 })
 
 /**
+ * PATCH /api/reviews/:reviewId
+ * Update a review. Author OR Admin can edit.
+ */
+router.patch('/:reviewId', async (req, res) => {
+  const userId = getUserId(req)
+  const { reviewId } = req.params
+  const { content } = req.body
+
+  if (!userId) return res.status(401).json({ error: 'Must be logged in to edit a review' })
+  if (!content || content.trim().length === 0) return res.status(400).json({ error: 'Review content cannot be empty' })
+
+  const { data: existing } = await supabase
+    .from('reviews')
+    .select('user_id')
+    .eq('id', reviewId)
+    .maybeSingle()
+
+  if (!existing) return res.status(404).json({ error: 'Review not found' })
+
+  if (!(existing.user_id === userId)) {
+    return res.status(403).json({ error: 'Forbidden: You do not have permission to edit this review' });
+  }
+
+  const { data, error } = await supabase
+    .from('reviews')
+    .update({ content: content.trim() })
+    .eq('id', reviewId)
+    .select('*, users(username, picture_url)') 
+    .single()
+
+  if (error) return res.status(500).json({ error: error.message })
+  
+  res.json(data)
+})
+
+/**
  * DELETE /api/reviews/:reviewId
  * Delete a review. Only the author can delete their own review.
  */
