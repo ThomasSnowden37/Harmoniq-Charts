@@ -28,7 +28,7 @@ router.get('/song/:songId', async (req, res) => {
 
   const { data, error } = await supabase
     .from('reviews')
-    .select('id, content, created_at, user_id, users(username)')
+    .select('id, content, created_at, user_id, users(username, picture_url)')
     .eq('song_id', songId)
     .order('created_at', { ascending: false })
 
@@ -80,7 +80,7 @@ router.post('/:songId', async (req, res) => {
   const { data, error } = await supabase
     .from('reviews')
     .insert({ user_id: userId, song_id: songId, content: content.trim() })
-    .select('id, content, created_at, user_id, users(username)')
+    .select('id, content, created_at, user_id, users(username, picture_url)')
     .single()
 
   if (error) return res.status(500).json({ error: error.message })

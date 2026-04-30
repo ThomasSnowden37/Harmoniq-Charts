@@ -171,7 +171,7 @@ export default function SongPage() {
     const [listento, setListento] = useState(false)
     const [liked, setLiked] = useState(false)
     const [likeCount, setLikeCount] = useState(0)
-    const [reviews, setReviews] = useState<{ id: string; content: string; created_at: string; user_id: string; users: { username: string } }[]>([])
+    const [reviews, setReviews] = useState<{ id: string; content: string; created_at: string; user_id: string; users: { username: string; picture_url?: string } }[]>([])
     const [reviewText, setReviewText] = useState('')
     const [reviewError, setReviewError] = useState<string | null>(null)
     const [submittingReview, setSubmittingReview] = useState(false)
@@ -641,6 +641,7 @@ useEffect(() => {
                         <Avatar 
                           size="2" 
                           radius="full" 
+                          src={review.users?.picture_url}
                           fallback={review.users?.username?.slice(0, 2).toUpperCase() || '??'} 
                           className="hover:opacity-80 transition-opacity"
                         />

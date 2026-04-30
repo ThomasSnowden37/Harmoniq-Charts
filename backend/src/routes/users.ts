@@ -49,7 +49,7 @@ router.get('/:id', async (req, res) => {
 
   const { data, error } = await supabase
     .from('users')
-    .select('id, username, email, privacy, reputation, created_at')
+    .select('id, username, email, privacy, reputation, created_at, picture_url')
     .eq('id', profileId)
     .single()
 
@@ -86,12 +86,13 @@ router.patch('/:id', async (req, res) => {
   if (!userId) return res.status(401).json({ error: 'Missing x-user-id header' })
   if (userId !== req.params.id) return res.status(403).json({ error: 'You can only update your own profile' })
 
-  const { privacy, username } = req.body
+  const { privacy, username, picture_url } = req.body
   
   // Create an object with only the fields provided in the request
   const updates: any = {}
   if (privacy && ['public', 'private'].includes(privacy)) updates.privacy = privacy
   if (username && username.trim().length > 0) updates.username = username.trim()
+  if (picture_url !== undefined) updates.picture_url = typeof picture_url === 'string' ? picture_url.trim() || null : null
 
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'No valid fields provided for update' })
@@ -101,7 +102,7 @@ router.patch('/:id', async (req, res) => {
     .from('users')
     .update(updates)
     .eq('id', userId)
-    .select('id, username, email, privacy, reputation, created_at')
+    .select('id, username, email, privacy, reputation, created_at, picture_url')
     .single()
 
   if (error) return res.status(500).json({ error: error.message })

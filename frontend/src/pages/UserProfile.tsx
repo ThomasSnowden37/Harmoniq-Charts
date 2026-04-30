@@ -38,6 +38,7 @@ interface ProfileUser {
   username: string
   privacy: PrivacySetting
   reputation?: number
+  picture_url?: string
   isAdmin?: boolean
   restricted?: boolean
   isBanned?: boolean
@@ -177,6 +178,7 @@ export default function UserProfile() {
       const data = await res.json()
       setProfileUser({
         ...data,
+        picture_url: data.picture_url,
         isAdmin: Boolean(data.is_admin),
         isBanned: Boolean(data.is_banned),
         banEndTime: data.ban_end_time,
@@ -376,7 +378,7 @@ export default function UserProfile() {
   async function fetchListenLaterPlaylist() {
     try {
       const res = await fetch(`/api/users/${userId}/ListenLater`, {
-        headers: { 'x-user-id': MOCK_CURRENT_USER_ID },
+        headers: { 'x-user-id': currentUserId },
       })
       if (res.ok) {
         const data = await res.json()
@@ -524,6 +526,7 @@ export default function UserProfile() {
 
   const isRestricted = !isOwnProfile && profileUser?.restricted
   const initials = profileUser?.username?.slice(0, 2).toUpperCase() ?? '??'
+  const profileImageUrl = profileUser?.picture_url ?? (isOwnProfile ? user?.picture : undefined)
 
   return (
     <Box className="min-h-screen bg-background flex flex-col">
@@ -555,6 +558,7 @@ export default function UserProfile() {
           <Flex align="center" gap="5">
             <Avatar
               size="7"
+              src={profileImageUrl}
               fallback={initials}
               variant="solid"
             />
@@ -834,9 +838,9 @@ export default function UserProfile() {
           onClose={() => setShowSettingsModal(false)}
           currentPrivacy={profileUser.privacy}
           onPrivacyChange={handlePrivacyChange}
-          // Add these two new props:
           currentUsername={profileUser.username}
           onUsernameChange={(newUsername) => setProfileUser({ ...profileUser, username: newUsername })}
+          onPictureUrlChange={(url) => setProfileUser((prev) => prev ? { ...prev, picture_url: url } : prev)}
           onDeleteAccount={() => {
             setShowSettingsModal(false)
             setDeleteUserModal(true)

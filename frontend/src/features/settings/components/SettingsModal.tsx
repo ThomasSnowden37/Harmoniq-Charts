@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ChangeEvent } from 'react'
 import { Dialog, Button } from '@radix-ui/themes'
 import { X } from 'lucide-react'
-import { MOCK_CURRENT_USER_ID } from '../../../lib/auth'
+import { useAuth } from '../../../context/AuthContext'
+import { supabase } from '../../../lib/supabase'
 import type { PrivacySetting } from '../types'
 import SpotifyConnectButton from '../../spotify/components/SpotifyConnectButton'
 
@@ -13,6 +14,7 @@ interface SettingsModalProps {
   currentUsername: string
   onUsernameChange: (username: string) => void
   onDeleteAccount: () => void
+  onPictureUrlChange?: (url: string) => void
 }
 
 export default function SettingsModal({ 
@@ -23,7 +25,9 @@ export default function SettingsModal({
   currentUsername,
   onUsernameChange,
   onDeleteAccount,
+  onPictureUrlChange,
 }: SettingsModalProps) {
+  const { user, updateUser } = useAuth()
   // Privacy State
   const [privacy, setPrivacy] = useState<PrivacySetting>(currentPrivacy)
   const [savingPrivacy, setSavingPrivacy] = useState(false)
@@ -32,6 +36,13 @@ export default function SettingsModal({
   const [username, setUsername] = useState(currentUsername)
   const [savingUsername, setSavingUsername] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+
+  // Profile Picture State
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [uploadingPicture, setUploadingPicture] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [pictureSuccess, setPictureSuccess] = useState(false)
 
   // Global Modal State
   const [error, setError] = useState<string | null>(null)
@@ -43,19 +54,34 @@ export default function SettingsModal({
       setUsername(currentUsername)
       setError(null)
       setShowSuccess(false)
+      setUploadError(null)
+      setPictureSuccess(false)
+      setSelectedFile(null)
     }
   }, [isOpen, currentPrivacy, currentUsername])
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl(null)
+      return
+    }
+
+    const url = URL.createObjectURL(selectedFile)
+    setPreviewUrl(url)
+
+    return () => URL.revokeObjectURL(url)
+  }, [selectedFile])
 
   async function handlePrivacyToggle() {
     const newPrivacy: PrivacySetting = privacy === 'public' ? 'private' : 'public'
     setSavingPrivacy(true)
     setError(null)
     try {
-      const res = await fetch(`/api/users/${MOCK_CURRENT_USER_ID}`, {
+      const res = await fetch(`/api/users/${user?.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': MOCK_CURRENT_USER_ID,
+          'x-user-id': user?.id || '',
         },
         body: JSON.stringify({ privacy: newPrivacy }),
       })
@@ -80,11 +106,11 @@ export default function SettingsModal({
     setShowSuccess(false)
     
     try {
-      const res = await fetch(`/api/users/${MOCK_CURRENT_USER_ID}`, {
+      const res = await fetch(`/api/users/${user?.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': MOCK_CURRENT_USER_ID,
+          'x-user-id': user?.id || '',
         },
         body: JSON.stringify({ username: username.trim() }),
       })
@@ -106,6 +132,67 @@ export default function SettingsModal({
     }
   }
 
+  async function handlePictureUpload() {
+    if (!user?.id || !selectedFile) return
+    setUploadingPicture(true)
+    setUploadError(null)
+    setPictureSuccess(false)
+    setError(null)
+
+    try {
+      const fileName = selectedFile.name.replace(/\s+/g, '_')
+      const path = `${user.id}/${Date.now()}_${fileName}`
+
+      const { error: uploadError } = await supabase
+        .storage
+        .from('profile_picture')
+        .upload(path, selectedFile, { cacheControl: '3600', upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = await supabase
+        .storage
+        .from('profile_picture')
+        .getPublicUrl(path)
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to generate profile picture URL')
+      }
+
+      const publicUrl = urlData.publicUrl
+      
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({ picture_url: publicUrl }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to save profile picture')
+      }
+
+      const updated = await res.json()
+      updateUser?.({ picture: updated.picture_url ?? user.picture })
+      onPictureUrlChange?.(updated.picture_url ?? '')
+      setSelectedFile(null)
+      setPictureSuccess(true)
+      setTimeout(() => setPictureSuccess(false), 3000)
+    } catch (err: any) {
+      setUploadError(err.message)
+    } finally {
+      setUploadingPicture(false)
+    }
+  }
+
+  function handleFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null
+    setSelectedFile(file)
+  }
+
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Content maxWidth="450px" >
@@ -125,6 +212,44 @@ export default function SettingsModal({
               <p className="text-destructive text-sm">{error}</p>
             </div>
           )}
+
+          {/* Profile Picture Setting */}
+          <div>
+            <h3 className="text-sm font-medium text-foreground mb-1">Profile Picture</h3>
+            <p className="text-muted-foreground text-xs mb-3">
+              Upload an image for your account avatar.
+            </p>
+            <div className="flex items-center gap-4 mb-3">
+              <div className="w-20 h-20 rounded-full overflow-hidden bg-muted flex items-center justify-center">
+                {previewUrl ? (
+                  <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                ) : user?.picture ? (
+                  <img src={user.picture} alt="Current avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-lg font-bold text-foreground">
+                    {currentUsername.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 space-y-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelection}
+                  className="text-sm text-muted-foreground"
+                />
+                <Button
+                  size="2"
+                  onClick={handlePictureUpload}
+                  disabled={!selectedFile || uploadingPicture}
+                >
+                  {uploadingPicture ? 'Uploading...' : 'Upload'}
+                </Button>
+                {uploadError && <p className="text-destructive text-xs">{uploadError}</p>}
+                {pictureSuccess && <p className="text-success text-xs">Profile picture updated successfully!</p>}
+              </div>
+            </div>
+          </div>
 
           {/* Username Setting */}
           <div>

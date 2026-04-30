@@ -65,8 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             body: JSON.stringify({
                 id: decoded.sub,
                 email: decoded.email,
-                username: decoded.name
-            })
+              username: decoded.name,
+              picture_url: decoded.picture,
+          })
         });
 
         if (res.ok) {
@@ -76,13 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const finalUser: GoogleUser = {
             ...googleUser,
             name: dbUser.username,
-            isAdmin: Boolean(dbUser.is_admin)
+            isAdmin: Boolean(dbUser.is_admin),
+            picture: dbUser.picture_url ?? googleUser.picture,
           };
 
           setUser(finalUser);
-          setRealUserId(finalUser.id); 
-
-          window.location.href = '/feed';
         }
       } catch (err) {
         console.error("Backend sync failed", err);
