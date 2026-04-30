@@ -186,11 +186,11 @@ export default function SettingsModal({
             </div>
           </div>
 
-          {/* Spotify Connection */}
+          {/* Platform Integrations */}
           <div>
-            <h3 className="text-sm font-medium text-foreground mb-1">Spotify Connection</h3>
+            <h3 className="text-sm font-medium text-foreground mb-1">Platform Integrations</h3>
             <p className="text-muted-foreground text-xs mb-3">
-              Connect your Spotify account to import playlists and link songs.
+              Connect your accounts to import playlists.
             </p>
             <div className="bg-secondary rounded-lg p-4">
               <SpotifyConnectButton />

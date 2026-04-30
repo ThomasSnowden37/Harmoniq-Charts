@@ -58,7 +58,7 @@ export default function SpotifyConnectButton({ showStatus = true }: SpotifyConne
         cursor: 'pointer',
       }}
     >
-      <SpotifyIcon />
+      <SpotifyIcon fill="white" />
       Connect Spotify
     </Button>
   )
