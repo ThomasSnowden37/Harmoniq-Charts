@@ -228,6 +228,18 @@ useEffect(() => {
       fetchFeed()
     }, [user])
 
+
+    if (loading) {
+        return (
+            <div>
+            <Navbar />
+            <div className="min-h-screen w-full flex items-center justify-center bg-background">
+                <p className="text-lg text-muted-foreground">Loading...</p>
+            </div>
+            <Footer />
+            </div>
+        )
+    }
     return (
         <div>
             <Navbar />
@@ -241,7 +253,7 @@ useEffect(() => {
                     <a href="/feed/all" className="text-sm text-primary underline">See all</a>
                 </div>
 
-                {loading && <p className="text-muted-foreground">Loading...</p>}
+
                 {!loading && feed.length === 0 && <p className="text-muted-foreground">No recent activity. Try adding some more friends</p>}
 
                 {!loading && feed.length > 0 && (
@@ -321,7 +333,7 @@ useEffect(() => {
                             {friendReviews.filter((_, index) => index % 2 === 0).map(review => (
                             <div
                                 key={review.id}
-                                className="w-80 rounded-xl border border-border bg-card p-4 shadow-sm"
+                                className="w-80 rounded-2xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all"
                             >
                                 <div className="flex justify-between items-start mb-2">
                                     <a
@@ -343,7 +355,7 @@ useEffect(() => {
                                     {review.song.title}
                                 </button>
 
-                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
                                 {review.content}
                                 </p>
                             </div>
@@ -354,7 +366,7 @@ useEffect(() => {
                             {friendReviews.filter((_, index) => index % 2 === 1).map(review => (
                             <div
                                 key={review.id}
-                                className="w-80 rounded-xl border border-border bg-card p-4 shadow-sm"
+                                className="w-80 rounded-2xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all"
                             >
                                 <div className="flex justify-between items-start mb-2">
                                     <a
