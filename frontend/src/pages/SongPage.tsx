@@ -15,6 +15,7 @@ import {SpotifyIcon} from '../features/spotify/components/SpotifyConnectButton'
 import SongSuggestionModal from '../features/proposals/components/SongProposalModal'
 import MergeProposalModal from '../features/proposals/components/MergeSongsProposalModal'
 import { MOCK_CURRENT_USER_ID } from '@/lib/auth'
+import LoginPromptModal from '../components/LoginPromptModal'
 
 /**
  * SongPage.tsx
@@ -181,6 +182,8 @@ export default function SongPage() {
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null)
     const [editReviewText, setEditReviewText] = useState('')
     const [editReviewError, setEditReviewError] = useState<string | null>(null)
+    const [loginPromptOpen, setLoginPromptOpen] = useState(false)
+    const [loginPromptAction, setLoginPromptAction] = useState('')
     
 
     const MAX_CHARS = 100
@@ -668,8 +671,9 @@ useEffect(() => {
                         }`}
                         onClick={async () => {
                           if (!user) {
-                            alert('You must be logged in to like a review');
-                            return;
+                            setLoginPromptAction('like a review')
+                            setLoginPromptOpen(true)
+                            return
                           }
 
                           const hasLiked = review.review_likes?.some((like) => like.user_id === user.id);
@@ -880,6 +884,11 @@ useEffect(() => {
             </Flex>
           </Dialog.Content>
         </Dialog.Root>
+        <LoginPromptModal 
+          isOpen={loginPromptOpen} 
+          onClose={() => setLoginPromptOpen(false)} 
+          actionName={loginPromptAction} 
+        />
       </Box>
       <Footer />
     </Box>

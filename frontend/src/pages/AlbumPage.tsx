@@ -236,11 +236,13 @@ export default function AlbumPage() {
               <Text size="2" color="gray" as="p" mt="1">{songs.length} {songs.length === 1 ? 'song' : 'songs'}</Text>
             </div>
             <div>
-              <div className="flex gap-3">
-                <Button variant={albumSuccess === 'listento' ? 'solid' : 'outline'} onClick={() => handleAddAlbum('listento')} disabled={albumLoading !== null}>{albumLoading === 'listento' ? 'Adding...' : albumSuccess === 'listento' ? 'Album Added' : '+ Add to Listen To'}</Button>
-                <Button variant={albumSuccess === 'listened' ? 'solid' : 'outline'} onClick={() => handleAddAlbum('listened')} disabled={albumLoading !== null}>{albumLoading === 'listened' ? 'Adding...' : albumSuccess === 'listened' ? 'Album Added' : '+ Mark Album as Listened'}</Button>
-                <Button variant="outline" color="orange" onClick={() => setAlbumPlaylistOpen(true)}>+ Album to Playlist</Button>
-              </div>
+              {user && (
+                <div className="flex gap-3">
+                  <Button variant={albumSuccess === 'listento' ? 'solid' : 'outline'} onClick={() => handleAddAlbum('listento')} disabled={albumLoading !== null}>{albumLoading === 'listento' ? 'Adding...' : albumSuccess === 'listento' ? 'Album Added' : '+ Add to Listen To'}</Button>
+                  <Button variant={albumSuccess === 'listened' ? 'solid' : 'outline'} onClick={() => handleAddAlbum('listened')} disabled={albumLoading !== null}>{albumLoading === 'listened' ? 'Adding...' : albumSuccess === 'listened' ? 'Album Added' : '+ Mark Album as Listened'}</Button>
+                  <Button variant="outline" color="orange" onClick={() => setAlbumPlaylistOpen(true)}>+ Album to Playlist</Button>
+                </div>
+              )}
             </div>
           </Flex>
         </Box>

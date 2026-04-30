@@ -5,6 +5,7 @@ import type { PlaylistWithSongs, PlaylistComment } from '../features/playlists/t
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import LoginPromptModal from '../components/LoginPromptModal'
 
 
 /**
@@ -44,6 +45,9 @@ export default function PlaylistPage() {
   const MAX_COMMENT_LENGTH = 1000
   const trimmedComment = newComment.trim()
   const isCommentOverLimit = trimmedComment.length > MAX_COMMENT_LENGTH
+
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false)
+  const [loginPromptAction, setLoginPromptAction] = useState('')
 
   useEffect(() => {
     if (!playlistId) return
@@ -252,7 +256,14 @@ export default function PlaylistPage() {
             </div>
             <Button
               variant={liked ? 'solid' : 'outline'}
-              onClick={toggleLike}
+              onClick={() => {
+                if (!user) {
+                  setLoginPromptAction('like a playlist')
+                  setLoginPromptOpen(true)
+                  return
+                } 
+                toggleLike()
+              }}
               disabled={likeLoading}
             >
               <svg
@@ -335,12 +346,13 @@ export default function PlaylistPage() {
           <Heading size="4" mb="4">Comments</Heading>
           
           {/* Add Comment */}
-          <Card mb="4">
-            <Flex direction="column" gap="3" p="3">
-              <TextArea
-                placeholder="Add a comment..."
-                value={newComment}
-                onChange={e => setNewComment(e.target.value)}
+          {user && (
+            <Card mb="4">
+              <Flex direction="column" gap="3" p="3">
+                <TextArea
+                  placeholder="Add a comment..."
+                  value={newComment}
+                  onChange={e => setNewComment(e.target.value)}
                 disabled={commentLoading}
               />
               <Flex justify="between" align="center">
@@ -355,7 +367,7 @@ export default function PlaylistPage() {
                 <Text size="1" color="red">Comment must be {MAX_COMMENT_LENGTH} characters or less</Text>
               )}
             </Flex>
-          </Card>
+          </Card>)}
 
           {/* Comments List */}
           {comments.length === 0 ? (
@@ -393,6 +405,11 @@ export default function PlaylistPage() {
               ))}
             </Flex>
           )}
+          <LoginPromptModal 
+            isOpen={loginPromptOpen} 
+            onClose={() => setLoginPromptOpen(false)} 
+            actionName={loginPromptAction} 
+          />
         </Box>
       </Box>
       <Footer />

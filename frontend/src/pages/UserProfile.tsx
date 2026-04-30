@@ -455,7 +455,7 @@ export default function UserProfile() {
     return (
       <Flex direction="column" gap="3">
         <Flex gap="2" wrap="wrap">
-          {(() => {
+          {user && (() => {
             switch (relationship.status) {
               case 'none':
                 return (
