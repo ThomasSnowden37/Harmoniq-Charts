@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { isAdminUser } from '../lib/admin.js'
 import { supabase } from '../lib/supabase.js'
+import { getActiveBan } from '../lib/ban.js'
 import { isFriend } from './friends.js'
 
 /**
@@ -33,9 +34,12 @@ router.get('/:id', async (req, res) => {
 
   if (error) return res.status(404).json({ error: 'User not found' })
 
+  const activeBan = await getActiveBan(profileId)
   const response = {
     ...data,
     is_admin: await isAdminUser(profileId),
+    is_banned: Boolean(activeBan),
+    ban_end_time: activeBan?.end_time ?? null,
   }
 
   // Public profiles, own profile, or no viewer — return full data
